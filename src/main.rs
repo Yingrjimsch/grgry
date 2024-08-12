@@ -292,6 +292,7 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
     };
     println!("{}", mass_val);
     let repos = find_git_repos_parallel(None, &mass_val);
+    println!("{:?}", repos);
     for repo in repos {
         match has_changes() {
             Ok(true) => {
@@ -321,23 +322,6 @@ fn command_to_string(command: &Command) -> String {
     let cmd_str = format!("{:?}", command);
     cmd_str
 }
-
-// fn run_command(command: &mut Command, test: bool) -> io::Result<()> {
-//     if test {
-//         let cmd_str = command_to_string(command);
-//         println!("Executing: {}", cmd_str);
-//         Ok(())    
-//     }
-//     else {
-//         let output = command.output()?;
-//         if output.status.success() {
-//             Ok(())
-//         } else {
-//             let stderr = String::from_utf8_lossy(&output.stderr);
-//             Err(io::Error::new(io::ErrorKind::Other, format!("Command failed: {}", stderr)))
-//         }    
-//     }
-// }
 
 fn run_cmd_o(command: &mut Command, test: bool) -> String {
     if test {
