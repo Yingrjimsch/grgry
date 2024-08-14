@@ -30,6 +30,7 @@ use lazy_static::lazy_static;
 use std::sync::Mutex;
 use config::Config;
 use config::Profile;
+const TEST: bool = false;
 
 #[derive(Parser)]
 #[command(name = "grgry")]
@@ -66,11 +67,6 @@ fn main() {
 
     match &cli.command {
         Commands::Clone { directory, force, branch } => {
-            // for (key, profile) in &config.profiles {
-            //     println!("Profile: {} - {:?}", key, profile);
-            // }
-            // let active_profile = get_active_profile(&CONFIG.lock().unwrap());
-            // println!("Profile: {:?}", active_profile);
             clone(directory, *force);
         },
         Commands::Reclone { directory, force } => {
@@ -83,46 +79,43 @@ fn main() {
             let _ = quick(message, *force, mass, config);
         },
         Commands::Profile { sub } => 
-        // let profile_keys: Vec<String>;
-        // let profiles_ref;
         {
-            // println!("Hello");
-            // let config_guard = CONFIG.lock().unwrap();
-            // println!("yeee");
-            // // println!("{:?}", config_guard);
-            // let profiles_keys: Vec<&str> = config_guard.profiles.keys().map(|key| key.as_str()).collect();
-            // let profiles_ref = &mut config_guard.profiles;
             match &sub {
-                // commands::ProfileCommands::Activate => {
-                //     // let mut config_guard = CONFIG.lock().unwrap();
-                //     activate_profile_prompt(profiles_keys, &mut config_guard.profiles)
-                // },
-                // commands::ProfileCommands::Add => {
-                //     let mut config_guard = CONFIG.lock().unwrap();
-                //     println!("test");
-                //     add_profile(profiles_keys, &mut config_guard.profiles)
-                // },
-                // commands::ProfileCommands::Delete => {
-                //     let mut config_guard = CONFIG.lock().unwrap();
-                //     delete_profile_prompt(profiles_keys, &mut config_guard.profiles)},
-    
                 commands::ProfileCommands::Activate => activate_profile_prompt(&mut config),
                 commands::ProfileCommands::Add => add_profile(&mut config),
                 commands::ProfileCommands::Delete => delete_profile_prompt(&mut config),
             }
         }
+        Commands::Test {} => {let _ = test();}
     }
 }
 
-// fn get_active_profile(config: &Config) -> &Profile {
-//     match config.profiles.values().find(|profile| profile.active) {
-//         Some(profile) => profile,
-//         None => {
-//             eprintln!("One profile needs to be activated. For activating a profile use grgry activate!");
-//             process::exit(1);
-//         }
-//     }
-// }
+fn test() {
+    let mut change_repo: bool = false;
+    while !change_repo {
+        let decision = CustomType::<String>::new("Do you want to quicken this repo? (y)es/(n)o/(m)ore information:")
+        .with_validator(&|input: &String| {
+            match input.to_lowercase().as_str() {
+                "y" | "n" | "m" => Ok(Validation::Valid),
+                _ => Ok(Validation::Invalid("Please enter 'y', 'n', or 'm'.".into())),
+            }
+        })
+        .with_error_message("Please type 'y', 'n', or 'm'.")
+        .with_help_message("Enter 'y' for Yes, 'n' for No, or 'm' for More.")
+        .prompt();
+    println!("{:?}", decision);
+    match decision {
+        Ok(choice) => match choice.to_lowercase().as_str() {
+            "y" => {change_repo = true; println!("You chose Yes!")},
+            "n" => {change_repo = true; println!("You chose No!")},
+            "m" => println!("You chose More!"),
+            _ => unreachable!(),
+        },
+        Err(_) => println!("We could not process your choice."),
+    }
+    }
+    
+}
 
 fn delete_profile_prompt(config: &mut Config) {
     let test = do_clone(&config.profiles);
@@ -140,10 +133,6 @@ fn delete_profile_prompt(config: &mut Config) {
         Err(_) => println!("There was an error, please try again"),
     }
 }
-
-// fn delete_profile(profiles: &mut HashMap<String, Profile>, choice: &str) {
-//     profiles.remove(choice);
-// }
 
 fn add_profile(config: &mut Config) {
     let _profile_name = Text::new("profile name:")
@@ -235,51 +224,6 @@ fn activate_profile_prompt(config: &mut Config) {
     }
 }
 
-// fn activate_profile(profiles: &mut HashMap<String, Profile>, choice: &str) {
-//     for (key, profile) in profiles.iter_mut() {
-//         profile.active = key == choice;
-//     }
-// }
-
-// fn save_profiles(profiles: &mut HashMap<String, Profile>) {
-//     let file_path = "/home/axgno01/.config/grgry.toml";
-//     let toml_content = fs::read_to_string(file_path).expect("Failed to read file");
-//     let mut doc = toml_content.parse::<DocumentMut>().expect("Failed to parse TOML");
-
-//     // Remove profiles that are no longer in the HashMap
-//     let existing_keys: Vec<String> = doc.iter().map(|(key, _)| key.to_string()).collect();
-
-//     for key in existing_keys {
-//         if !profiles.contains_key(&key) {
-//             doc.remove(&key);
-//         }
-//     }
-
-//     for (key, profile) in profiles.iter() {
-//         if let Some(profile_table) = doc[key].as_table_mut() {
-//             profile_table["active"] = value(profile.active);
-//             profile_table["pulloption"] = value(&profile.pulloption);
-//             profile_table["username"] = value(&profile.username);
-//             profile_table["email"] = value(&profile.email);
-//             profile_table["baseaddress"] = value(&profile.baseaddress);
-//             profile_table["managertype"] = value(&profile.managertype);
-//             profile_table["token"] = value(&profile.token);
-//         } else {
-//             // If the profile does not exist, create it
-//             let mut new_profile = toml_edit::Table::new();
-//             new_profile["active"] = value(profile.active);
-//             new_profile["pulloption"] = value(&profile.pulloption);
-//             new_profile["username"] = value(&profile.username);
-//             new_profile["email"] = value(&profile.email);
-//             new_profile["baseaddress"] = value(&profile.baseaddress);
-//             new_profile["managertype"] = value(&profile.managertype);
-//             new_profile["token"] = value(&profile.token);
-//             doc[key] = toml_edit::Item::Table(new_profile);
-//         }
-//     }
-//     fs::write(file_path, doc.to_string()).expect("Failed to write file");
-// }
-
 fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Config) -> io::Result<()>{
     println!("Quick with message: {}", message);
     if force {
@@ -294,25 +238,59 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
     let repos = find_git_repos_parallel(None, &mass_val);
     println!("{:?}", repos);
     for repo in repos {
-        match has_changes() {
-            Ok(true) => {
-                println!("There are changes in the repository {}", repo.clone().into_os_string().into_string().unwrap());
-                let _activate = Confirm::new("Do you want to quicken the repository?")
-                .with_default(false)
-                .prompt();
-                match _activate {Ok(_) => {
-                    run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "add", "."]), false);
-                    run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "commit", "--author", &format!("{} <{}>", config.active_profile().username, config.active_profile().email), "-m", message]), false);
-                    let current_branch = run_cmd_o(Command::new("git").args(&["branch", "--show-current"]), false);
-                    println!("Current branch: {}", &current_branch);
-                    let branch_exists = false;// check_branch_exists_on_origin(&current_branch);
-                    println!("Current branch exists?: {}", branch_exists);
-                    run_cmd_s(Command::new("git").args(push_to_origin(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, !branch_exists)), false); //TODO here please right push command
-                    
-                }, Err(_) => continue};
+        let mut change_repo: bool = false;
+        let has_changes = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "status", "--porcelain"]), TEST);
+        match !has_changes.is_empty() {
+            true => {
+                while !change_repo {
+                    println!("There are changes in the repository {}", repo.clone().into_os_string().into_string().unwrap());
+                    let _activate = CustomType::<String>::new("Do you want to quicken this repo? (y)es/(n)o/(m)ore information:")
+                    .with_validator(&|input: &String| {
+                        match input.to_lowercase().as_str() {
+                            "y" | "n" | "m" => Ok(Validation::Valid),
+                            _ => Ok(Validation::Invalid("Please enter 'y', 'n', or 'm'.".into())),
+                        }
+                    })
+                    .with_error_message("Please type 'y', 'n', or 'm'.")
+                    .prompt();
+                    match _activate {
+                        Ok(choice) => match choice.to_lowercase().as_str() {
+                            "y" => {
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.name", &config.active_profile().username]), TEST);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.email", &config.active_profile().email]), TEST);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "add", "."]), TEST);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "commit", "--author", &format!("{} <{}>", config.active_profile().username, config.active_profile().email), "-m", message]), TEST);
+                                let current_branch = run_cmd_o(Command::new("git").args(&["branch", "--show-current"]), TEST);
+                                println!("Current branch: {}", &current_branch);
+                                let branch_exists = false;// check_branch_exists_on_origin(&current_branch);
+                                println!("Current branch exists?: {}", branch_exists);
+                                run_cmd_s(Command::new("git").args(push_to_origin(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, !branch_exists)), TEST); //TODO here please right push command        
+                                change_repo = true;
+                            },
+                            "n" => {change_repo = true},
+                            "m" => {
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "diff"]), TEST);
+                                println!("{0: <10}: {1}", "URL", &run_cmd_o(Command::new("git").args(&["config", "--get", "remote.origin.url"]), TEST));
+                                println!("{0: <10}: {1}", "Branch", &run_cmd_o(Command::new("git").args(&["branch", "--show-current"]), TEST));
+                                // println!(
+                                //     "{0: <10} | {1: <10} | {2: <10} | {3: <10}",
+                                //     "total", "blanks", "comments", "code"
+                                // );
+                                // println!("{0: <10} | {1: <10} | {2: <10} | {3: <10}", 0, 0, 0, 0);
+                                // println!("{0: <10} | {1: <10} | {2: <10} | {3: <10}", 77, 0, 3, 74);
+                                // println!("{0: <10} | {1: <10} | {2: <10} | {3: <10}", 112, 0, 6, 106);
+                                // println!(
+                                //     "{0: <10} | {1: <10} | {2: <10} | {3: <10}",
+                                //     460, 0, 10, 1371
+                                // );
+                            },
+                            _ => unreachable!(),
+                        },
+                        Err(_) => {change_repo = true}
+                    };
+                }
             },
-            Ok(false) => {},
-            Err(e) => eprintln!("Error checking repository: {}", e),
+            false => {},
         }
     }
     Ok(())

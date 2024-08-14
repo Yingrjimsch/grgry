@@ -53,6 +53,7 @@ pub enum Commands {
         sub: ProfileCommands
 
     },
+    Test
 }
 
 #[derive(Subcommand)]
