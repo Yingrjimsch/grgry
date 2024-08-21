@@ -14,8 +14,8 @@ grgry is particularly helpful if you need to:
 4. Manage multiple git providers and accounts simultaneously.
 
 ##  Supported Providers
-1. GitHub
-2. GitLab
+1. Github
+2. Gitlab
 
 ##  Setup
 
@@ -68,7 +68,7 @@ pulloption = "ssh"
 username = "Your Name" 
 email = "your@email.com" 
 baseaddress = "https://gitlab.com" 
-managertype = "gitlab" 
+provider = "gitlab" 
 token = "glp-1234..." 
 targetbasepath = "/your/base/repo/path" 
 
@@ -78,7 +78,7 @@ pulloption = "https"
 username = "Your Name" 
 email = "your@email.com" 
 baseaddress = "https://api.github.com" 
-managertype = "github" 
+provider = "github" 
 token = "token github_pat_1233..." 
 targetbasepath = "/your/base/repo/path" 
 </code></pre>

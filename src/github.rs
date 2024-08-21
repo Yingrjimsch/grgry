@@ -1,15 +1,10 @@
-use std::{convert, process};
-
-use futures::future::ok;
 use regex::Regex;
-use reqwest::{header::{HeaderMap, HeaderName, HeaderValue}, Client, Response};
+use reqwest::Response;
 use serde::Deserialize;
-use tokio::{spawn, task::{self, block_in_place}};
+use tokio::task::block_in_place;
 
-use crate::git_providers::{call_api, get_repos_paralell, GitProvider, Repo};
+use crate::{config::Profile, git_providers::{call_api, get_repos_paralell, GitProvider, Repo}};
 const PER_PAGE: i16 = 100;
-
-pub struct GitHub;
 
 #[derive(Debug, Deserialize)]
 pub struct GithubRepo {
@@ -32,11 +27,20 @@ impl Repo for GithubRepo {
     }
 }
 
-impl GitProvider for GitHub {
-    fn get_repos(&self, pat: &Option<String>, base_address: &str, collection_name: &str, provider: &str) -> Vec<Box<dyn Repo>> {
+pub struct Github;
+impl GitProvider for Github {
+    fn get_repos(&self, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile) -> Vec<Box<dyn Repo>> {
         block_in_place(|| {
             let future = async {
-                let endpoint: String = format!("{}/orgs/{}/repos", base_address, collection_name); //here the replace / --> %2F is not done because Github projects are top level on org or on user
+                let collection_searchstring = match user {
+                    true => if active_profile.username == collection_name && active_profile.token != "" {
+                        "user"
+                    } else {
+                        &format!("users/{}", collection_name)
+                    },
+                    false => &format!("orgs/{}", collection_name)
+                };
+                let endpoint: String = format!("{}/{}/repos", &active_profile.baseaddress, collection_searchstring); //here the replace / --> %2F is not done because Github projects are top level on org or on user
                 let headers: Option<Vec<(String, String)>> = match pat {
                     Some(token) => Some(vec![("Authorization".to_string(), token.clone()), ("User-Agent".to_string(), "grgry".to_string())]),
                     None => None,
@@ -45,7 +49,7 @@ impl GitProvider for GitHub {
                 let parameters: Option<Vec<(String, String)>> = Some(vec![
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
-                get_repos_paralell(pages, &endpoint, parameters, headers, provider).await
+                get_repos_paralell(pages, &endpoint, parameters, headers, &active_profile.provider).await
             };
     
             // Block on the async task, so it runs to completion and returns the result.

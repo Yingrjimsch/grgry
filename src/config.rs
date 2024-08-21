@@ -10,12 +10,12 @@ pub struct Profile {
     pub username: String,
     pub email: String,
     pub baseaddress: String,
-    pub managertype: String,
+    pub provider: String,
     pub token: String,
     pub targetbasepath: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
     pub profiles: HashMap<String, Profile>,
     config_file_path: String,
@@ -49,7 +49,7 @@ impl Config {
                 email: value["email"].as_str().unwrap_or("").to_string(),
                 baseaddress: value["baseaddress"].as_str().unwrap_or("").to_string(),
                 targetbasepath: value["targetbasepath"].as_str().unwrap_or("").to_string(), 
-                managertype: value["managertype"].as_str().unwrap_or("").to_string(),
+                provider: value["provider"].as_str().unwrap_or("").to_string(),
                 token: value["token"].as_str().unwrap_or("").to_string(),
             };
             profiles.insert(key.to_string(), profile);
@@ -93,7 +93,7 @@ impl Config {
                 profile_table["email"] = value(&profile.email);
                 profile_table["baseaddress"] = value(&profile.baseaddress);
                 profile_table["targetbasepath"] = value(&profile.targetbasepath);
-                profile_table["managertype"] = value(&profile.managertype);
+                profile_table["provider"] = value(&profile.provider);
                 profile_table["token"] = value(&profile.token);
             } else {
                 // If the profile does not exist, create it
@@ -104,7 +104,7 @@ impl Config {
                 new_profile["email"] = value(&profile.email);
                 new_profile["baseaddress"] = value(&profile.baseaddress);
                 new_profile["targetbasepath"] = value(&profile.targetbasepath);
-                new_profile["managertype"] = value(&profile.managertype);
+                new_profile["provider"] = value(&profile.provider);
                 new_profile["token"] = value(&profile.token);
                 doc[key] = toml_edit::Item::Table(new_profile);
             }
@@ -114,12 +114,25 @@ impl Config {
     }
 
     pub fn active_profile(&self) -> &Profile {
-    match self.profiles.values().find(|profile| profile.active) {
-        Some(profile) => profile,
-        None => {
-            eprintln!("One profile needs to be activated. For activating a profile use grgry activate!");
-            std::process::exit(1);
+        match self.profiles.values().find(|profile| profile.active) {
+            Some(profile) => profile,
+            None => {
+                eprintln!("One profile needs to be activated. For activating a profile use grgry activate!");
+                std::process::exit(1);
+            }
         }
     }
-}
+
+    pub fn find_profiles_by_provider(&self, remote_origin_url: &str) -> Vec<&str> {
+        self.profiles
+            .iter()
+            .filter_map(|(key, profile)| {
+                if remote_origin_url.contains(&profile.provider) {
+                    Some(key.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }

@@ -3,12 +3,12 @@ use std::process;
 use reqwest::{header::{HeaderMap, HeaderName, HeaderValue}, Client, Response};
 use tokio::task;
 
-use crate::{github::GithubRepo, gitlab::GitlabRepo};
+use crate::{config::Profile, github::GithubRepo, gitlab::GitlabRepo};
 
 // Define the trait in a common file (e.g., `git_provider.rs`)
 pub trait GitProvider {
     fn get_page_number(&self, endpoint: &str, headers: Option<Vec<(String, String)>>) -> i32;
-    fn get_repos(&self, pat: &Option<String>, base_address: &str, collection_name: &str, provider: &str) -> Vec<Box<dyn Repo>>;
+    fn get_repos(&self, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile) -> Vec<Box<dyn Repo>>;
 }
 
 pub trait Repo: Send + Sync {
@@ -23,7 +23,7 @@ pub async fn get_repos_paralell(
     endpoint: &str,
     parameters: Option<Vec<(String, String)>>,
     headers: Option<Vec<(String, String)>>,
-    manager_type: &str,  // Enum to distinguish between GitLab and GitHub
+    provider: &str,  // Enum to distinguish between Github and Gitlab
 ) -> Vec<Box<dyn Repo>> {
     let mut tasks: Vec<task::JoinHandle<Result<Vec<Box<dyn Repo>>, reqwest::Error>>> = Vec::new();
     
@@ -31,7 +31,7 @@ pub async fn get_repos_paralell(
         let endpoint_clone = endpoint.to_string();
         let mut parameters_clone = parameters.clone();
         let headers_clone = headers.clone();
-        let provider: String = manager_type.to_string();
+        let provider: String = provider.to_string();
         if let Some(params) = &mut parameters_clone {
             params.push(("page".to_string(), page.to_string()));
         }
