@@ -1,7 +1,4 @@
 use clap::Subcommand;
-
-use crate::Profile;
-
 #[derive(Subcommand)]
 pub enum Commands {
     #[command(about = "Clone a repository into the specified directory")]
@@ -20,7 +17,7 @@ pub enum Commands {
     },
     #[command(about = "Make git add, git commit, git push in one go.")]
     Quick {
-        #[arg(value_name = "MESSAGE", help = "Commit message for quick.")]
+        #[arg(value_name = "MESSAGE", help = "Commit message same as git commit -m <MESSAGE>.")]
         message: String,
 
         #[arg(short, long, default_value_t = false)]

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use colored::Colorize;
 use toml_edit::{value, DocumentMut};
 use serde::{Deserialize, Serialize};
 
@@ -117,7 +118,7 @@ impl Config {
         match self.profiles.values().find(|profile| profile.active) {
             Some(profile) => profile,
             None => {
-                eprintln!("One profile needs to be activated. For activating a profile use grgry activate!");
+                eprintln!("{}", "One profile needs to be activated. For activating a profile use grgry activate!".red());
                 std::process::exit(1);
             }
         }

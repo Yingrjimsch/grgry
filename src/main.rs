@@ -14,10 +14,12 @@ use inquire::validator::Validation;
 use inquire::Confirm;
 use rayon::str;
 use std::collections::HashMap;
+use std::io::Stdout;
 use std::process::Command;
 use std::io;
 use std::process;
 use std::process::Stdio;
+use std::ptr::null;
 use inquire::{
     error::InquireError,
     required, CustomType, Select, Text,
@@ -72,11 +74,11 @@ async fn main() {
 }
 
 fn delete_profile_prompt(config: &mut Config) {
-    let test = do_clone(&config.profiles);
-    let profile_keys: Vec<&str> = test.keys().map(|key| key.as_str()).collect();
-    let ans: Result<&str, InquireError> = Select::new("Which profile do you choose?", profile_keys).prompt();
+    let profiles_cloned = do_clone(&config.profiles);
+    let profile_keys: Vec<&str> = profiles_cloned.keys().map(|key| key.as_str()).collect();
+    let profile_to_delete_key: Result<&str, InquireError> = Select::new("Which profile do you want to delete?", profile_keys).prompt();
     
-    match ans {
+    match profile_to_delete_key {
         Ok(choice) => {
             config.delete_profile(choice);
             config.save_config();
@@ -163,11 +165,11 @@ fn do_clone<K: Clone, V: Clone>(data: &HashMap<K,V>) -> HashMap<K, V> {
 }
 
 fn activate_profile_prompt(config: &mut Config) {
-    let test = do_clone(&config.profiles);
-    let profile_keys: Vec<&str> = test.keys().map(|key| key.as_str()).collect();
+    let profiles_cloned = do_clone(&config.profiles);
+    let profile_keys: Vec<&str> = profiles_cloned.keys().map(|key| key.as_str()).collect();
 
-    let ans: Result<&str, InquireError> = Select::new("Which profile do you choose?", profile_keys).prompt();
-    match ans {
+    let profile_to_activate_key: Result<&str, InquireError> = Select::new("Which profile do you choose?", profile_keys).prompt();
+    match profile_to_activate_key {
         Ok(choice) => {
             config.activate_profile(choice);
             config.save_config();
@@ -208,28 +210,26 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
                                 let profile = if profile_keys.len() == 1 {
                                     config.profiles.get(&profile_keys.first().unwrap().to_string()).unwrap()
                                 } else {
-                                    let selected_profile_key: Result<&str, InquireError> = Select::new("Which profile do you choose?", profile_keys).prompt();
+                                    let selected_profile_key: Result<&str, InquireError> = Select::new("Choose profile to quicken?", profile_keys).prompt();
                                     let chosen_profile = match selected_profile_key {
                                         Ok(choice) => config.profiles.get(choice).unwrap(),
                                         Err(_) => config.active_profile(),
                                     };
                                     chosen_profile
                                 };
-                                println!("test");
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.name", &profile.username]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.email", &profile.email]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "add", "."]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "commit", "-m", message]), TEST);
                                 let current_branch = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "branch", "--show-current"]), TEST);
-                                println!("Current branch: {}", &current_branch);
                                 let set_upstream = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "ls-remote", "--heads", "origin", &current_branch]), TEST).is_empty();
-                                println!("Need to set upstream?: {}", set_upstream);
-                                run_cmd_s(Command::new("git").args(create_push_request_args(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, set_upstream)), TEST); //TODO here please right push command        
+                                run_cmd_s(Command::new("git").args(create_push_request_args(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, set_upstream)), TEST);
+                                println!("{} {}", "Successfully pushed repo into:".green(), remote_origin_url);
                                 break;
                             },
                             "n" => break,
                             "m" => {
-                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "diff"]), TEST);
+                                run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "diff"]), TEST);
                                 println!("{0: <10}: {1}", "URL", &remote_origin_url);
                                 println!("{0: <10}: {1}", "Branch", &run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "branch", "--show-current"]), TEST));
                             },
@@ -286,7 +286,7 @@ fn run_cmd_s(command: &mut Command, test: bool) -> bool {
         println!("Executing: {}", cmd_str);
         return true;
     } else {
-        let status = command.status().expect("Failed to execute command!");
+        let status = command.stdout(Stdio::null()).stderr(Stdio::null()).status().expect("Failed to execute command!");
         if !status.success() {
             eprintln!("Error executing command on {}", command_to_string(command));
             std::process::exit(1);
@@ -335,9 +335,9 @@ async fn clone(directory: &str, user: bool, branch: String, regex: &str, config:
             }
             let branch_exists = run_cmd_o(Command::new("git").args(&["-C", &destination_path, "ls-remote", "--heads", "origin", &current_branch]), TEST);
             if branch_exists != "" {
-                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "checkout", &current_branch]).stdout(Stdio::null()).stderr(Stdio::null()), TEST);
+                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "checkout", &current_branch]), TEST);
                 //HERE only git pull the shit out of it
-                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "pull"]).stdout(Stdio::null()).stderr(Stdio::null()), TEST);
+                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "pull"]), TEST);
                 println!("Repo: {} successfully pulled!", clone_url);
             }
             return;
