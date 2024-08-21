@@ -8,20 +8,18 @@ use clap::Parser;
 use commands::Commands;
 use git_providers::GitProvider;
 use git_providers::Repo;
-use github::GitHub;
-use gitlab::GitLab;
+use github::Github;
+use gitlab::Gitlab;
 use inquire::validator::Validation;
 use inquire::Confirm;
 use rayon::str;
-use reqwest::Response;
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::process::Command;
 use std::io;
 use std::process;
 use std::process::Stdio;
 use inquire::{
-    error::{InquireError},
+    error::InquireError,
     required, CustomType, Select, Text,
 };
 use rayon::prelude::*;
@@ -31,11 +29,10 @@ use walkdir::WalkDir;
 use config::{Config, Profile};
 use colored::Colorize;
 use std::thread;
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::sync::mpsc;
 
 const TEST: bool = false;
-const PER_PAGE: i16 = 100;
 
 #[derive(Parser)]
 #[command(name = "grgry")]
@@ -50,21 +47,15 @@ async fn main() {
     let mut config = match dirs::home_dir() {
         Some(path) => Config::new(&format!("{}/.config/grgry.toml", path.to_str().unwrap())),
         None => {
-            eprintln!("Could not load config file!");
+            eprintln!("{}", "Could not load config file!".red());
             process::exit(1);
         }
     };
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Clone { directory, regex, branch } => {
-            clone(directory, branch.to_string(), regex, config).await;
-        },
-        Commands::Reclone { directory, force } => {
-            reclone(directory, *force);
-        },
-        Commands::Commit { directory, force, message, recursive, quick } => {
-            // clone(directory, *force, config);
+        Commands::Clone { directory, user, branch, regex } => {
+            clone(directory, *user, branch.to_string(), regex, config).await;
         },
         Commands::Quick { message, force, mass } => {
             let _ = quick(message, *force, mass, config);
@@ -77,22 +68,7 @@ async fn main() {
                 commands::ProfileCommands::Delete => delete_profile_prompt(&mut config),
             }
         }
-        Commands::Test {} => {
-            println!("Started test");
-            // test();
-        }
     }
-}
-
-// #[derive(Deserialize, Debug)]
-// struct GithubRepo {
-//     name: String,
-//     ssh_url: String,
-//     clone_url: String,
-// }
-
-fn test() {
-
 }
 
 fn delete_profile_prompt(config: &mut Config) {
@@ -103,17 +79,15 @@ fn delete_profile_prompt(config: &mut Config) {
     match ans {
         Ok(choice) => {
             config.delete_profile(choice);
-        
             config.save_config();
-            
-            println!("{:?}", config);
+            println!("{}", serde_json::to_string_pretty(&config).unwrap());
         },
-        Err(_) => println!("There was an error, please try again"),
+        Err(_) => println!("{}", "There was an error, please try again".red()),
     }
 }
 
 fn add_profile_prompt(config: &mut Config) {
-    let _profile_name = Text::new("profile name:")
+    let profile_name = Text::new("profile name:")
         .with_validator(required!("This field is required"))
         //TODO: would be nice to validate if the profile already exists but does not work due to my rust incapabilities
         // .with_validator(
@@ -126,63 +100,62 @@ fn add_profile_prompt(config: &mut Config) {
         // })
         .with_help_message("Optional notes")
         .prompt();
-    match _profile_name {Ok(_) => {}, Err(_) => process::exit(1)};
+    match profile_name {Ok(_) => {}, Err(_) => process::exit(1)};
 
-    let _target_base_path = Text::new("target base path:")
+    let target_base_path = Text::new("target base path:")
     .with_validator(required!("This field is required"))
         .with_help_message("Optional notes")
         .with_default("")
         .prompt();
-    match _target_base_path {Ok(_) => {}, Err(_) => process::exit(1)};
+    match target_base_path {Ok(_) => {}, Err(_) => process::exit(1)};
 
-    let _user_name = Text::new("user name:")
+    let user_name = Text::new("user name:")
         .with_help_message("Optional notes")
         .with_default("")
         .prompt();
-    match _user_name {Ok(_) => {}, Err(_) => process::exit(1)};
+    match user_name {Ok(_) => {}, Err(_) => process::exit(1)};
 
-    let _user_email = Text::new("user email:")
+    let user_email = Text::new("user email:")
         .with_help_message("Optional notes")
         .with_default("")
         .prompt();
-    match _user_email {Ok(_) => {}, Err(_) => process::exit(1)};
+    match user_email {Ok(_) => {}, Err(_) => process::exit(1)};
 
-    let manager_types: Vec<&str> = vec!["github", "gitlab"];
-    let managertype: Result<&str, InquireError> = Select::new("choose manager type", manager_types).prompt();
-    match managertype {Ok(_) => {}, Err(_) => process::exit(1)};
+    let providers: Vec<&str> = vec!["github", "gitlab"];
+    let provider: Result<&str, InquireError> = Select::new("choose provider", providers).prompt();
+    match provider {Ok(_) => {}, Err(_) => process::exit(1)};
 
     let pull_options: Vec<&str> = vec!["ssh", "https"];
     let pulloption: Result<&str, InquireError> = Select::new("choose pull option", pull_options).prompt();
     match pulloption {Ok(_) => {}, Err(_) => process::exit(1)};
 
-    let _baseaddress = Text::new("base address:")
+    let base_address = Text::new("base address:")
         .with_validator(required!("This field is required"))
         .with_help_message("Optional notes")
         .prompt();
-    match _baseaddress {Ok(_) => {}, Err(_) => process::exit(1)};
+    match base_address {Ok(_) => {}, Err(_) => process::exit(1)};
 
-    let _token = Text::new("token:")
+    let token = Text::new("token:")
         .with_help_message("Optional notes")
         .with_default("")
         .prompt();
-    match _token {Ok(_) => {}, Err(_) => process::exit(1)};
+    match token {Ok(_) => {}, Err(_) => process::exit(1)};
 
-    let _activate = Confirm::new("Do you want to activate the profile?")
+    let activate = Confirm::new("Do you want to activate the profile?")
         .with_default(false)
         .prompt();
-    match _activate {Ok(_) => {}, Err(_) => process::exit(1)};
+    match activate {Ok(_) => {}, Err(_) => process::exit(1)};
 
-    let profile_name = _profile_name.unwrap();
-    config.profiles.insert(profile_name.clone(), Profile { active: false, pulloption: String::from(pulloption.unwrap()),  username: _user_name.unwrap(), targetbasepath: _target_base_path.unwrap(), email: _user_email.unwrap(), baseaddress: _baseaddress.unwrap(), managertype: String::from(managertype.unwrap()), token: _token.unwrap()});
-    match _activate {
+    let profile_name = profile_name.unwrap();
+    config.profiles.insert(profile_name.clone(), Profile { active: false, pulloption: String::from(pulloption.unwrap()),  username: user_name.unwrap(), targetbasepath: target_base_path.unwrap(), email: user_email.unwrap(), baseaddress: base_address.unwrap(), provider: String::from(provider.unwrap()), token: token.unwrap()});
+    match activate {
         Ok(true) => {
             config.activate_profile(&profile_name.clone());
         }
         _ => {}
     }
     config.save_config();
-    println!("{:?}", config);
-
+    println!("{}", serde_json::to_string_pretty(&config).unwrap());
 }
 
 fn do_clone<K: Clone, V: Clone>(data: &HashMap<K,V>) -> HashMap<K, V> {
@@ -198,7 +171,7 @@ fn activate_profile_prompt(config: &mut Config) {
         Ok(choice) => {
             config.activate_profile(choice);
             config.save_config();
-            println!("Activated profile is: {}", choice);
+            println!("{} {}", "Activated profile is:".green(), choice.green());
         },
         Err(_) => println!("There was an error, please try again"),
     }
@@ -206,10 +179,6 @@ fn activate_profile_prompt(config: &mut Config) {
 
 //TODO: check profile and switch automatically
 fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Config) -> io::Result<()> {
-    println!("Quick with message: {}", message); 
-    if force {
-        println!("Force option is enabled.");
-    }
     let mass_val = match mass {
         Some(Some(mass_value)) => mass_value.to_string(), // If the user provided a value, use it
         Some(None) => String::from(".*"),      // If the user provided the flag but no value, use ".*"
@@ -217,44 +186,56 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
     };
     let repos = find_git_repos_parallel(None, &mass_val);
     for repo in repos {
-        let mut change_repo: bool = false;
         let has_changes = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "status", "--porcelain"]), TEST);
         match !has_changes.is_empty() {
             true => {
-                while !change_repo {
+                loop {
                     println!("There are changes in the repository {}", repo.clone().into_os_string().into_string().unwrap());
-                    let _activate = CustomType::<String>::new("Do you want to quicken this repo? (y)es/(n)o/(m)ore information:")
+                    let allow_quicken = CustomType::<String>::new("Do you want to quicken this repo? (y)es/(n)o/(m)ore information:")
                     .with_validator(&|input: &String| {
                         match input.to_lowercase().as_str() {
                             "y" | "n" | "m" => Ok(Validation::Valid),
-                            _ => Ok(Validation::Invalid("Please enter 'y', 'n', or 'm'.".into())),
+                            _ => Ok(Validation::Invalid("Please enter 'y', 'n', or 'm'.".red().into())),
                         }
                     })
-                    .with_error_message("Please type 'y', 'n', or 'm'.")
+                    .with_error_message(&"Please type 'y', 'n', or 'm'.".red())
                     .prompt();
-                    match _activate {
+                    let remote_origin_url = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "--get", "remote.origin.url"]), TEST);
+                    match allow_quicken {
                         Ok(choice) => match choice.to_lowercase().as_str() {
                             "y" => {
-                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.name", &config.active_profile().username]), TEST);
-                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.email", &config.active_profile().email]), TEST);
+                                let profile_keys = config.find_profiles_by_provider(&remote_origin_url);
+                                let profile = if profile_keys.len() == 1 {
+                                    config.profiles.get(&profile_keys.first().unwrap().to_string()).unwrap()
+                                } else {
+                                    let selected_profile_key: Result<&str, InquireError> = Select::new("Which profile do you choose?", profile_keys).prompt();
+                                    let chosen_profile = match selected_profile_key {
+                                        Ok(choice) => config.profiles.get(choice).unwrap(),
+                                        Err(_) => config.active_profile(),
+                                    };
+                                    chosen_profile
+                                };
+                                println!("test");
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.name", &profile.username]), TEST);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.email", &profile.email]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "add", "."]), TEST);
-                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "commit", "--author", &format!("{} <{}>", config.active_profile().username, config.active_profile().email), "-m", message]), TEST);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "commit", "-m", message]), TEST);
                                 let current_branch = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "branch", "--show-current"]), TEST);
                                 println!("Current branch: {}", &current_branch);
-                                let branch_exists = false; //TODO: check_branch_exists_on_origin(&current_branch);
-                                println!("Current branch exists?: {}", branch_exists);
-                                run_cmd_s(Command::new("git").args(push_to_origin(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, !branch_exists)), TEST); //TODO here please right push command        
-                                change_repo = true;
+                                let set_upstream = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "ls-remote", "--heads", "origin", &current_branch]), TEST).is_empty();
+                                println!("Need to set upstream?: {}", set_upstream);
+                                run_cmd_s(Command::new("git").args(create_push_request_args(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, set_upstream)), TEST); //TODO here please right push command        
+                                break;
                             },
-                            "n" => {change_repo = true},
+                            "n" => break,
                             "m" => {
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "diff"]), TEST);
-                                println!("{0: <10}: {1}", "URL", &run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "--get", "remote.origin.url"]), TEST));
+                                println!("{0: <10}: {1}", "URL", &remote_origin_url);
                                 println!("{0: <10}: {1}", "Branch", &run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "branch", "--show-current"]), TEST));
                             },
                             _ => unreachable!(),
                         },
-                        Err(_) => {change_repo = true}
+                        Err(_) => break
                     };
                 }
             },
@@ -314,7 +295,7 @@ fn run_cmd_s(command: &mut Command, test: bool) -> bool {
     }
 }
 
-async fn clone(directory: &str, branch: String, regex: &str, config: Config) {
+async fn clone(directory: &str, user: bool, branch: String, regex: &str, config: Config) {
     // 1. Get current active profile
     // 2. Have branch as parameter
     // 3. find amount of repositories
@@ -323,15 +304,15 @@ async fn clone(directory: &str, branch: String, regex: &str, config: Config) {
     // 6. filter repos by regex
     // 7. clone all in targetbasepath
     let active_profile: Profile = config.active_profile().clone();
-    let pat: Option<String> = Some(active_profile.token);
-    let provider_type: &str = &active_profile.managertype;
+    let pat: Option<String> = Some(active_profile.clone().token);
+    let provider_type: &str = &active_profile.provider;
     // Find amount of repositories
     let provider: Box<dyn GitProvider> = match provider_type {
-        "gitlab" => Box::new(GitLab),
-        "github" => Box::new(GitHub),
+        "gitlab" => Box::new(Gitlab),
+        "github" => Box::new(Github),
         _ => unreachable!()
     };
-    let all_repos: Vec<Box<dyn Repo>> = provider.get_repos(&pat, &active_profile.baseaddress, directory, &active_profile.managertype);//gitlab::get_gitlab_repos_paralell(pages, &pat, &active_profile.baseaddress, directory).await;
+    let all_repos: Vec<Box<dyn Repo>> = provider.get_repos(&pat, directory, user, active_profile.clone());
     
     let num_threads = std::thread::available_parallelism().unwrap().into();
     let re = Regex::new(regex).expect("Invalid regex pattern");
@@ -362,9 +343,9 @@ async fn clone(directory: &str, branch: String, regex: &str, config: Config) {
             return;
         }
 
-        let status = run_cmd_s(Command::new("git").args(&create_pull_request_args(&branch, &clone_url, &active_profile.targetbasepath, &repo.full_path()))/*.stdout(Stdio::null()).stderr(Stdio::null()) */, TEST);
+        let status = run_cmd_s(Command::new("git").args(&create_pull_request_args(&branch, &clone_url, &active_profile.targetbasepath, &repo.full_path())).stdout(Stdio::null()).stderr(Stdio::null()), TEST);
         if status {
-            println!("Repo: {} successfully cloned!", clone_url);
+            println!("Repo: {} successfully cloned!", clone_url.green());
         }
     });
     println!("Finished cloning repositories");
@@ -418,7 +399,7 @@ fn find_git_repos_parallel(root: Option<&Path>, pattern: &str) -> Vec<PathBuf> {
 
 
 
-fn push_to_origin(repo_path: &str, branch: &str, set_upstream: bool) -> Vec<String> {
+fn create_push_request_args(repo_path: &str, branch: &str, set_upstream: bool) -> Vec<String> {
 
     let mut args = vec!["-C".to_string(), repo_path.to_string(), "push".to_string(), "origin".to_string(), branch.to_string()];
 

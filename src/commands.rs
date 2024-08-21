@@ -8,35 +8,15 @@ pub enum Commands {
     Clone {
         #[arg(value_name = "DIRECTORY", help = "The group / org / user / repo to clone")]
         directory: String,
-
-        #[arg(long, default_value = ".*", help = "Filter the directory via regex (default .*)")]
-        regex: String,
+        
+        #[arg(short, long, default_value_t = false, help = "Specify if the directory is a user directory or not (default false)")]
+        user: bool,
 
         #[arg(short, long, default_value = "", help = "Clone specific branch (default no specific branch)")]
         branch: String,
-    },
-    Reclone {
-        #[arg(value_name = "DIRECTORY")]
-        directory: String,
 
-        #[arg(short, long, default_value_t = false)]
-        force: bool,
-    },
-    Commit {
-        #[arg(value_name = "DIRECTORY")]
-        directory: String,
-
-        #[arg(short, long, default_value = "")]
-        message: String,
-
-        #[arg(short, long, default_value_t = false)]
-        recursive: bool,
-
-        #[arg(short, long, default_value_t = false)]
-        quick: bool,
-
-        #[arg(short, long, default_value_t = false)]
-        force: bool,
+        #[arg(long, default_value = ".*", help = "Filter the directory via regex (default .*)")]
+        regex: String,
     },
     #[command(about = "Make git add, git commit, git push in one go.")]
     Quick {
@@ -54,7 +34,6 @@ pub enum Commands {
         sub: ProfileCommands
 
     },
-    Test
 }
 
 #[derive(Subcommand)]
