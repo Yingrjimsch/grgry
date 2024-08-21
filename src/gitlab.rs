@@ -1,9 +1,8 @@
 use crate::{git_providers::{call_api, get_repos_paralell, GitProvider, Repo}, github::GithubRepo};
-use std::{convert, process};
 
-use reqwest::{header::{HeaderMap, HeaderName, HeaderValue}, Client, Response};
+use reqwest::{Response};
 use serde::Deserialize;
-use tokio::{spawn, task::{self, block_in_place}};
+use tokio::{task::{block_in_place}};
 const PER_PAGE: i16 = 100;
 
 pub struct GitLab;
