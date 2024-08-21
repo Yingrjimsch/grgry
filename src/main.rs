@@ -224,7 +224,7 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
                                 let current_branch = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "branch", "--show-current"]), TEST);
                                 let set_upstream = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "ls-remote", "--heads", "origin", &current_branch]), TEST).is_empty();
                                 run_cmd_s(Command::new("git").args(create_push_request_args(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, set_upstream)), TEST);
-                                println!("{} {}", "Successfully pushed repo into:".green(), remote_origin_url);
+                                println!("\n{} {} {} {}", "Successfully pushed repo into:".green(), remote_origin_url.green(), "on branch".green(), current_branch.green());
                                 break;
                             },
                             "n" => break,
