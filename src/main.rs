@@ -371,7 +371,6 @@ fn reclone(directory: &str, force: bool) {
     if force {
         println!("Force option is enabled.");
     }
-    // Implement your reclone logic here
 }
 
 fn find_git_repos_parallel(root: Option<&Path>, pattern: &str) -> Vec<PathBuf> {
