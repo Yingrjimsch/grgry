@@ -60,7 +60,7 @@ async fn main() {
             clone(directory, *user, branch.to_string(), regex, config).await;
         },
         Commands::Quick { message, force, mass } => {
-            let _ = quick(message, *force, mass, config);
+            quick(message, *force, mass, config);
         },
         Commands::Profile { sub } => 
         {
@@ -180,7 +180,7 @@ fn activate_profile_prompt(config: &mut Config) {
 }
 
 //TODO: check profile and switch automatically
-fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Config) -> io::Result<()> {
+fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Config) {
     let mass_val = match mass {
         Some(Some(mass_value)) => mass_value.to_string(), // If the user provided a value, use it
         Some(None) => String::from(".*"),      // If the user provided the flag but no value, use ".*"
@@ -217,19 +217,19 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
                                     };
                                     chosen_profile
                                 };
-                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.name", &profile.username]), TEST);
-                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.email", &profile.email]), TEST);
-                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "add", "."]), TEST);
-                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "commit", "-m", message]), TEST);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.name", &profile.username]), TEST, true);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.email", &profile.email]), TEST, true);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "add", "."]), TEST, true);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "commit", "-m", message]), TEST, true);
                                 let current_branch = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "branch", "--show-current"]), TEST);
                                 let set_upstream = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "ls-remote", "--heads", "origin", &current_branch]), TEST).is_empty();
-                                run_cmd_s(Command::new("git").args(create_push_request_args(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, set_upstream)), TEST);
+                                run_cmd_s(Command::new("git").args(create_push_request_args(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, set_upstream)), TEST, true);
                                 println!("\n{} {} {} {}", "Successfully pushed repo into:".green(), remote_origin_url.green(), "on branch".green(), current_branch.green());
                                 break;
                             },
                             "n" => break,
                             "m" => {
-                                run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "diff"]), TEST);
+                                run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "diff"]), TEST, false);
                                 println!("{0: <10}: {1}", "URL", &remote_origin_url);
                                 println!("{0: <10}: {1}", "Branch", &run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "branch", "--show-current"]), TEST));
                             },
@@ -242,7 +242,6 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
             false => {},
         }
     }
-    Ok(())
 }
 
 fn command_to_string(command: &Command) -> String {
@@ -280,13 +279,18 @@ fn run_cmd_o_soft(command: &mut Command, test: bool) -> (String, bool) {
     }
 }
 
-fn run_cmd_s(command: &mut Command, test: bool) -> bool {
+fn run_cmd_s(mut command: &mut Command, test: bool, silent: bool) -> bool {
     if test {
         let cmd_str = command_to_string(command);
         println!("Executing: {}", cmd_str);
         return true;
     } else {
-        let status = command.stdout(Stdio::null()).stderr(Stdio::null()).status().expect("Failed to execute command!");
+        command = if silent {
+            command.stdout(Stdio::null()).stderr(Stdio::null())
+        } else {
+            command
+        };
+        let status = command.status().expect("Failed to execute command!");
         if !status.success() {
             eprintln!("Error executing command on {}", command_to_string(command));
             std::process::exit(1);
@@ -335,15 +339,15 @@ async fn clone(directory: &str, user: bool, branch: String, regex: &str, config:
             }
             let branch_exists = run_cmd_o(Command::new("git").args(&["-C", &destination_path, "ls-remote", "--heads", "origin", &current_branch]), TEST);
             if branch_exists != "" {
-                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "checkout", &current_branch]), TEST);
+                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "checkout", &current_branch]), TEST, true);
                 //HERE only git pull the shit out of it
-                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "pull"]), TEST);
+                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "pull"]), TEST, true);
                 println!("Repo: {} successfully pulled!", clone_url);
             }
             return;
         }
 
-        let status = run_cmd_s(Command::new("git").args(&create_pull_request_args(&branch, &clone_url, &active_profile.targetbasepath, &repo.full_path())).stdout(Stdio::null()).stderr(Stdio::null()), TEST);
+        let status = run_cmd_s(Command::new("git").args(&create_pull_request_args(&branch, &clone_url, &active_profile.targetbasepath, &repo.full_path())).stdout(Stdio::null()).stderr(Stdio::null()), TEST, true);
         if status {
             println!("Repo: {} successfully cloned!", clone_url.green());
         }
