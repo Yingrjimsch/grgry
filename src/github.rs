@@ -1,29 +1,51 @@
-use crate::{git_providers::{call_api, get_repos_paralell, GitProvider, Repo}, github::GithubRepo};
 use std::{convert, process};
 
+use futures::future::ok;
+use regex::Regex;
 use reqwest::{header::{HeaderMap, HeaderName, HeaderValue}, Client, Response};
 use serde::Deserialize;
 use tokio::{spawn, task::{self, block_in_place}};
+
+use crate::git_providers::{call_api, get_repos_paralell, GitProvider, Repo};
 const PER_PAGE: i16 = 100;
 
-pub struct GitLab;
+pub struct GitHub;
 
-impl GitProvider for GitLab {
-    fn get_repos(&self, pat: &Option<String>, base_address: &str, collection_name: &str, manager_type: &str) -> Vec<Box<dyn Repo>> {
+#[derive(Debug, Deserialize)]
+pub struct GithubRepo {
+    pub ssh_url: String,
+    pub clone_url: String,
+    pub full_name: String,
+}
+
+impl Repo for GithubRepo {
+    fn ssh_url(&self) -> &str {
+        &self.ssh_url
+    }
+
+    fn http_url(&self) -> &str {
+        &self.clone_url
+    }
+
+    fn full_path(&self) -> &str {
+        &self.full_name
+    }
+}
+
+impl GitProvider for GitHub {
+    fn get_repos(&self, pat: &Option<String>, base_address: &str, collection_name: &str, provider: &str) -> Vec<Box<dyn Repo>> {
         block_in_place(|| {
             let future = async {
-                let endpoint: String = format!("{}/api/v4/groups/{}/projects", base_address, collection_name.replace("/", "%2F"));
+                let endpoint: String = format!("{}/orgs/{}/repos", base_address, collection_name); //here the replace / --> %2F is not done because Github projects are top level on org or on user
                 let headers: Option<Vec<(String, String)>> = match pat {
-                    Some(token) => Some(vec![("Private-Token".to_string(), token.clone()), ("User-Agent".to_string(), "grgry".to_string())]),
+                    Some(token) => Some(vec![("Authorization".to_string(), token.clone()), ("User-Agent".to_string(), "grgry".to_string())]),
                     None => None,
                 };
                 let pages: i32 = self.get_page_number(&endpoint, headers.clone());
                 let parameters: Option<Vec<(String, String)>> = Some(vec![
-                    ("include_subgroups".to_string(), "true".to_string()),
-                    ("simple".to_string(), "true".to_string()),
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
-                get_repos_paralell(pages, &endpoint, parameters, headers, manager_type).await
+                get_repos_paralell(pages, &endpoint, parameters, headers, provider).await
             };
     
             // Block on the async task, so it runs to completion and returns the result.
@@ -36,13 +58,18 @@ impl GitProvider for GitLab {
         block_in_place(|| {
             let future = async {
                 let parameters: Option<Vec<(String, String)>> = Some(vec![
-                    ("include_subgroups".to_string(), "true".to_string()),
-                    ("simple".to_string(), "true".to_string()),
                     ("page".to_string(), "1".to_string()),
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
                 let resp_total_repos: Response = call_api(endpoint, parameters.as_deref(), headers.as_deref()).await;
-                return resp_total_repos.headers().get("x-total-pages").and_then(|hv| hv.to_str().ok()).and_then(|s| s.parse::<i32>().ok()).unwrap();
+                let pages = match resp_total_repos.headers().get("link") {
+                    Some(page) => {
+                        let re = Regex::new(r"page=(\d+)").unwrap();
+                        re.captures_at(page.to_str().ok().unwrap(), 3).unwrap().get(1).unwrap().as_str().parse::<i32>().ok().unwrap()
+                    },
+                    None => 1
+                };
+                return pages;
             };
             // Block on the async task, so it runs to completion and returns the result.
             let repos = tokio::runtime::Handle::current().block_on(future);
@@ -50,25 +77,3 @@ impl GitProvider for GitLab {
         })
     }
 }
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct GitlabRepo {
-    pub ssh_url_to_repo: String,
-    pub http_url_to_repo: String,
-    pub path_with_namespace: String
-}
-
-impl Repo for GitlabRepo {
-    fn ssh_url(&self) -> &str {
-        &self.ssh_url_to_repo
-    }
-
-    fn http_url(&self) -> &str {
-        &self.http_url_to_repo
-    }
-
-    fn full_path(&self) -> &str {
-        &self.path_with_namespace
-    }
-}
-

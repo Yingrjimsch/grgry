@@ -1,11 +1,14 @@
 mod commands;
 mod config;
 mod gitlab;
+mod github;
 mod git_providers;
 
 use clap::Parser;
 use commands::Commands;
 use git_providers::GitProvider;
+use git_providers::Repo;
+use github::GitHub;
 use gitlab::GitLab;
 use inquire::validator::Validation;
 use inquire::Confirm;
@@ -81,12 +84,12 @@ async fn main() {
     }
 }
 
-#[derive(Deserialize, Debug)]
-struct GithubRepo {
-    name: String,
-    ssh_url: String,
-    clone_url: String,
-}
+// #[derive(Deserialize, Debug)]
+// struct GithubRepo {
+//     name: String,
+//     ssh_url: String,
+//     clone_url: String,
+// }
 
 fn test() {
 
@@ -325,19 +328,20 @@ async fn clone(directory: &str, branch: String, regex: &str, config: Config) {
     // Find amount of repositories
     let provider: Box<dyn GitProvider> = match provider_type {
         "gitlab" => Box::new(GitLab),
-        _ => panic!("Unknown provider type")
+        "github" => Box::new(GitHub),
+        _ => unreachable!()
     };
-    let all_repos: Vec<gitlab::GitlabRepo> = provider.get_repos(&pat, &active_profile.baseaddress, directory);//gitlab::get_gitlab_repos_paralell(pages, &pat, &active_profile.baseaddress, directory).await;
+    let all_repos: Vec<Box<dyn Repo>> = provider.get_repos(&pat, &active_profile.baseaddress, directory, &active_profile.managertype);//gitlab::get_gitlab_repos_paralell(pages, &pat, &active_profile.baseaddress, directory).await;
     
     let num_threads = std::thread::available_parallelism().unwrap().into();
     let re = Regex::new(regex).expect("Invalid regex pattern");
-    let repos_to_clone: Vec<gitlab::GitlabRepo> = all_repos.into_iter().filter(|repo| re.is_match(&repo.http_url_to_repo) || re.is_match(&repo.ssh_url_to_repo)).collect();
-    run_in_threads(num_threads, repos_to_clone, move |thread_id: usize, repo: &gitlab::GitlabRepo| {
-        let destination_path: String = format!("{}/{}", active_profile.targetbasepath, repo.path_with_namespace);
+    let repos_to_clone: Vec<Box<dyn Repo>> = all_repos.into_iter().filter(|repo| re.is_match(&repo.http_url()) || re.is_match(&repo.ssh_url())).collect();
+    run_in_threads(num_threads, repos_to_clone, move |thread_id: usize, repo: &Box<dyn Repo>| {
+        let destination_path: String = format!("{}/{}", active_profile.targetbasepath, repo.full_path());
         let clone_url = if active_profile.pulloption == "ssh" {
-            &repo.ssh_url_to_repo
+            &repo.ssh_url()
         } else {
-            &repo.http_url_to_repo
+            &repo.http_url()
         };
         if Path::new(&destination_path).exists() {
             let mut current_branch = branch.clone();
@@ -358,7 +362,7 @@ async fn clone(directory: &str, branch: String, regex: &str, config: Config) {
             return;
         }
 
-        let status = run_cmd_s(Command::new("git").args(&create_pull_request_args(&branch, &clone_url, &active_profile.targetbasepath, &repo.path_with_namespace))/*.stdout(Stdio::null()).stderr(Stdio::null()) */, TEST);
+        let status = run_cmd_s(Command::new("git").args(&create_pull_request_args(&branch, &clone_url, &active_profile.targetbasepath, &repo.full_path()))/*.stdout(Stdio::null()).stderr(Stdio::null()) */, TEST);
         if status {
             println!("Repo: {} successfully cloned!", clone_url);
         }
