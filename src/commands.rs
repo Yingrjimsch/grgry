@@ -6,13 +6,13 @@ use crate::Profile;
 pub enum Commands {
     #[command(about = "Clone a repository into the specified directory")]
     Clone {
-        #[arg(value_name = "DIRECTORY")]
+        #[arg(value_name = "DIRECTORY", help = "The group / org / user / repo to clone")]
         directory: String,
 
-        #[arg(short, long, default_value_t = false)]
-        force: bool,
+        #[arg(long, default_value = ".*", help = "Filter the directory via regex (default .*)")]
+        regex: String,
 
-        #[arg(short, long, default_value = "")]
+        #[arg(short, long, default_value = "", help = "Clone specific branch (default no specific branch)")]
         branch: String,
     },
     Reclone {
@@ -38,14 +38,15 @@ pub enum Commands {
         #[arg(short, long, default_value_t = false)]
         force: bool,
     },
+    #[command(about = "Make git add, git commit, git push in one go.")]
     Quick {
-        #[arg(value_name = "MESSAGE")]
+        #[arg(value_name = "MESSAGE", help = "Commit message for quick.")]
         message: String,
 
         #[arg(short, long, default_value_t = false)]
         force: bool,
 
-        #[arg(long, value_parser, num_args(0..=1))]
+        #[arg(long, value_parser, num_args(0..=1), help = "Quicken multiple repos at the same time, use --mass or --mass <regex>")]
         mass: Option<Option<String>>,
     },
     Profile {

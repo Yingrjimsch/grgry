@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use toml_edit::{value, Document, DocumentMut};
+use toml_edit::{value, DocumentMut};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -12,6 +12,7 @@ pub struct Profile {
     pub baseaddress: String,
     pub managertype: String,
     pub token: String,
+    pub targetbasepath: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -38,6 +39,7 @@ impl Config {
         let toml_content = fs::read_to_string(config_file_path).expect("Failed to read file");
         let doc = toml_content.parse::<DocumentMut>().expect("Failed to parse TOML");
 
+        //TODO on load check if not empty (VALID)
         let mut profiles = HashMap::new();
         for (key, value) in doc.iter() {
             let profile = Profile {
@@ -46,12 +48,12 @@ impl Config {
                 username: value["username"].as_str().unwrap_or("").to_string(),
                 email: value["email"].as_str().unwrap_or("").to_string(),
                 baseaddress: value["baseaddress"].as_str().unwrap_or("").to_string(),
+                targetbasepath: value["targetbasepath"].as_str().unwrap_or("").to_string(), 
                 managertype: value["managertype"].as_str().unwrap_or("").to_string(),
                 token: value["token"].as_str().unwrap_or("").to_string(),
             };
             profiles.insert(key.to_string(), profile);
         }
-
         profiles
     }
 
@@ -90,6 +92,7 @@ impl Config {
                 profile_table["username"] = value(&profile.username);
                 profile_table["email"] = value(&profile.email);
                 profile_table["baseaddress"] = value(&profile.baseaddress);
+                profile_table["targetbasepath"] = value(&profile.targetbasepath);
                 profile_table["managertype"] = value(&profile.managertype);
                 profile_table["token"] = value(&profile.token);
             } else {
@@ -100,6 +103,7 @@ impl Config {
                 new_profile["username"] = value(&profile.username);
                 new_profile["email"] = value(&profile.email);
                 new_profile["baseaddress"] = value(&profile.baseaddress);
+                new_profile["targetbasepath"] = value(&profile.targetbasepath);
                 new_profile["managertype"] = value(&profile.managertype);
                 new_profile["token"] = value(&profile.token);
                 doc[key] = toml_edit::Item::Table(new_profile);

@@ -1,36 +1,38 @@
 mod commands;
 mod config;
+mod gitlab;
+mod git_providers;
 
-use clap::parser::ValueSource;
 use clap::Parser;
 use commands::Commands;
-use inquire::formatter::OptionFormatter;
+use git_providers::GitProvider;
+use gitlab::GitLab;
 use inquire::validator::Validation;
 use inquire::Confirm;
 use rayon::str;
+use reqwest::Response;
 use serde::Deserialize;
-use toml_edit::DocumentMut;
-use toml_edit::Key;
 use std::collections::HashMap;
 use std::process::Command;
 use std::io;
 use std::process;
-use std::fs;
-use config_file::FromConfigFile;
+use std::process::Stdio;
 use inquire::{
-    error::{CustomUserError, InquireResult, InquireError},
-    required, CustomType, MultiSelect, Select, Text,
+    error::{InquireError},
+    required, CustomType, Select, Text,
 };
-use toml_edit::{Document, value};
 use rayon::prelude::*;
 use regex::Regex;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use lazy_static::lazy_static;
-use std::sync::Mutex;
-use config::Config;
-use config::Profile;
+use config::{Config, Profile};
+use colored::Colorize;
+use std::thread;
+use std::sync::{Arc};
+use std::sync::mpsc;
+
 const TEST: bool = false;
+const PER_PAGE: i16 = 100;
 
 #[derive(Parser)]
 #[command(name = "grgry")]
@@ -40,40 +42,26 @@ struct Cli {
     command: Commands,
 }
 
-// #[derive(Deserialize, Clone)]
-// pub struct Config {
-//     #[serde(flatten)]
-//     profiles: HashMap<String, Profile>,
-// }
-
-// #[derive(Debug, Deserialize, Clone)]
-// struct Profile {
-//     active: bool,
-//     pulloption: String, //This should be either ssh or https
-//     username: String, //Add here the username for author
-//     email: String, //Add here the email for author
-//     baseaddress: String, //This is the base url of the git instance e.g. https://github.com or https://gitlab.com
-//     managertype: String, //This is the type of version control manager either github, gitlab, bitbucket ...
-//     token: String //This is the user token which should allow api calls for mass cloning
-// }
-
-// lazy_static!{
-//     pub static ref CONFIG: Mutex<Config> = Mutex::new(Config::from_config_file("/home/axgno01/.config/grgry.toml").unwrap()); 
-// }
-
-fn main() {
-    let mut config: Config = Config::new("/home/axgno01/.config/grgry.toml");
+#[tokio::main]
+async fn main() {
+    let mut config = match dirs::home_dir() {
+        Some(path) => Config::new(&format!("{}/.config/grgry.toml", path.to_str().unwrap())),
+        None => {
+            eprintln!("Could not load config file!");
+            process::exit(1);
+        }
+    };
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Clone { directory, force, branch } => {
-            clone(directory, *force);
+        Commands::Clone { directory, regex, branch } => {
+            clone(directory, branch.to_string(), regex, config).await;
         },
         Commands::Reclone { directory, force } => {
             reclone(directory, *force);
         },
         Commands::Commit { directory, force, message, recursive, quick } => {
-            clone(directory, *force);
+            // clone(directory, *force, config);
         },
         Commands::Quick { message, force, mass } => {
             let _ = quick(message, *force, mass, config);
@@ -82,39 +70,26 @@ fn main() {
         {
             match &sub {
                 commands::ProfileCommands::Activate => activate_profile_prompt(&mut config),
-                commands::ProfileCommands::Add => add_profile(&mut config),
+                commands::ProfileCommands::Add => add_profile_prompt(&mut config),
                 commands::ProfileCommands::Delete => delete_profile_prompt(&mut config),
             }
         }
-        Commands::Test {} => {let _ = test();}
+        Commands::Test {} => {
+            println!("Started test");
+            // test();
+        }
     }
 }
 
+#[derive(Deserialize, Debug)]
+struct GithubRepo {
+    name: String,
+    ssh_url: String,
+    clone_url: String,
+}
+
 fn test() {
-    let mut change_repo: bool = false;
-    while !change_repo {
-        let decision = CustomType::<String>::new("Do you want to quicken this repo? (y)es/(n)o/(m)ore information:")
-        .with_validator(&|input: &String| {
-            match input.to_lowercase().as_str() {
-                "y" | "n" | "m" => Ok(Validation::Valid),
-                _ => Ok(Validation::Invalid("Please enter 'y', 'n', or 'm'.".into())),
-            }
-        })
-        .with_error_message("Please type 'y', 'n', or 'm'.")
-        .with_help_message("Enter 'y' for Yes, 'n' for No, or 'm' for More.")
-        .prompt();
-    println!("{:?}", decision);
-    match decision {
-        Ok(choice) => match choice.to_lowercase().as_str() {
-            "y" => {change_repo = true; println!("You chose Yes!")},
-            "n" => {change_repo = true; println!("You chose No!")},
-            "m" => println!("You chose More!"),
-            _ => unreachable!(),
-        },
-        Err(_) => println!("We could not process your choice."),
-    }
-    }
-    
+
 }
 
 fn delete_profile_prompt(config: &mut Config) {
@@ -134,7 +109,7 @@ fn delete_profile_prompt(config: &mut Config) {
     }
 }
 
-fn add_profile(config: &mut Config) {
+fn add_profile_prompt(config: &mut Config) {
     let _profile_name = Text::new("profile name:")
         .with_validator(required!("This field is required"))
         //TODO: would be nice to validate if the profile already exists but does not work due to my rust incapabilities
@@ -149,6 +124,13 @@ fn add_profile(config: &mut Config) {
         .with_help_message("Optional notes")
         .prompt();
     match _profile_name {Ok(_) => {}, Err(_) => process::exit(1)};
+
+    let _target_base_path = Text::new("target base path:")
+    .with_validator(required!("This field is required"))
+        .with_help_message("Optional notes")
+        .with_default("")
+        .prompt();
+    match _target_base_path {Ok(_) => {}, Err(_) => process::exit(1)};
 
     let _user_name = Text::new("user name:")
         .with_help_message("Optional notes")
@@ -188,7 +170,7 @@ fn add_profile(config: &mut Config) {
     match _activate {Ok(_) => {}, Err(_) => process::exit(1)};
 
     let profile_name = _profile_name.unwrap();
-    config.profiles.insert(profile_name.clone(), Profile { active: false, pulloption: String::from(pulloption.unwrap()),  username: _user_name.unwrap(), email: _user_email.unwrap(), baseaddress: _baseaddress.unwrap(), managertype: String::from(managertype.unwrap()), token: _token.unwrap()});
+    config.profiles.insert(profile_name.clone(), Profile { active: false, pulloption: String::from(pulloption.unwrap()),  username: _user_name.unwrap(), targetbasepath: _target_base_path.unwrap(), email: _user_email.unwrap(), baseaddress: _baseaddress.unwrap(), managertype: String::from(managertype.unwrap()), token: _token.unwrap()});
     match _activate {
         Ok(true) => {
             config.activate_profile(&profile_name.clone());
@@ -203,29 +185,25 @@ fn add_profile(config: &mut Config) {
 fn do_clone<K: Clone, V: Clone>(data: &HashMap<K,V>) -> HashMap<K, V> {
     data.clone()
 }
+
 fn activate_profile_prompt(config: &mut Config) {
     let test = do_clone(&config.profiles);
     let profile_keys: Vec<&str> = test.keys().map(|key| key.as_str()).collect();
 
-    // let test: Vec<&str> = profile_keys.into_iter().map(String::as_str).collect();
     let ans: Result<&str, InquireError> = Select::new("Which profile do you choose?", profile_keys).prompt();
-    
     match ans {
         Ok(choice) => {
             config.activate_profile(choice);
             config.save_config();
-            
-            println!("{:?}", config);
-            // activate_profile(config, choice);
-        
-            // save_profiles(profiles);
+            println!("Activated profile is: {}", choice);
         },
         Err(_) => println!("There was an error, please try again"),
     }
 }
 
-fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Config) -> io::Result<()>{
-    println!("Quick with message: {}", message);
+//TODO: check profile and switch automatically
+fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Config) -> io::Result<()> {
+    println!("Quick with message: {}", message); 
     if force {
         println!("Force option is enabled.");
     }
@@ -234,9 +212,7 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
         Some(None) => String::from(".*"),      // If the user provided the flag but no value, use ".*"
         None => String::from("false"),        // If the user didn't provide the flag, use "false" meaning only current folder
     };
-    println!("{}", mass_val);
     let repos = find_git_repos_parallel(None, &mass_val);
-    println!("{:?}", repos);
     for repo in repos {
         let mut change_repo: bool = false;
         let has_changes = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "status", "--porcelain"]), TEST);
@@ -260,9 +236,9 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.email", &config.active_profile().email]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "add", "."]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "commit", "--author", &format!("{} <{}>", config.active_profile().username, config.active_profile().email), "-m", message]), TEST);
-                                let current_branch = run_cmd_o(Command::new("git").args(&["branch", "--show-current"]), TEST);
+                                let current_branch = run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "branch", "--show-current"]), TEST);
                                 println!("Current branch: {}", &current_branch);
-                                let branch_exists = false;// check_branch_exists_on_origin(&current_branch);
+                                let branch_exists = false; //TODO: check_branch_exists_on_origin(&current_branch);
                                 println!("Current branch exists?: {}", branch_exists);
                                 run_cmd_s(Command::new("git").args(push_to_origin(&repo.clone().into_os_string().into_string().unwrap(), &current_branch, !branch_exists)), TEST); //TODO here please right push command        
                                 change_repo = true;
@@ -270,19 +246,8 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
                             "n" => {change_repo = true},
                             "m" => {
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "diff"]), TEST);
-                                println!("{0: <10}: {1}", "URL", &run_cmd_o(Command::new("git").args(&["config", "--get", "remote.origin.url"]), TEST));
-                                println!("{0: <10}: {1}", "Branch", &run_cmd_o(Command::new("git").args(&["branch", "--show-current"]), TEST));
-                                // println!(
-                                //     "{0: <10} | {1: <10} | {2: <10} | {3: <10}",
-                                //     "total", "blanks", "comments", "code"
-                                // );
-                                // println!("{0: <10} | {1: <10} | {2: <10} | {3: <10}", 0, 0, 0, 0);
-                                // println!("{0: <10} | {1: <10} | {2: <10} | {3: <10}", 77, 0, 3, 74);
-                                // println!("{0: <10} | {1: <10} | {2: <10} | {3: <10}", 112, 0, 6, 106);
-                                // println!(
-                                //     "{0: <10} | {1: <10} | {2: <10} | {3: <10}",
-                                //     460, 0, 10, 1371
-                                // );
+                                println!("{0: <10}: {1}", "URL", &run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "--get", "remote.origin.url"]), TEST));
+                                println!("{0: <10}: {1}", "Branch", &run_cmd_o(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "branch", "--show-current"]), TEST));
                             },
                             _ => unreachable!(),
                         },
@@ -317,42 +282,101 @@ fn run_cmd_o(command: &mut Command, test: bool) -> String {
     }
 }
 
-fn run_cmd_s(command: &mut Command, test: bool) {
+fn run_cmd_o_soft(command: &mut Command, test: bool) -> (String, bool) {
     if test {
         let cmd_str = command_to_string(command);
         println!("Executing: {}", cmd_str);
+        return (String::from(""), true);
+    } else {
+        let output = command.output().expect("Failed to execute command!");
+        if !output.status.success() {
+            return (String::from_utf8_lossy(&output.stdout).trim().to_string(), false)
+        }
+        return (String::from_utf8_lossy(&output.stdout).trim().to_string(), true)
+    }
+}
+
+fn run_cmd_s(command: &mut Command, test: bool) -> bool {
+    if test {
+        let cmd_str = command_to_string(command);
+        println!("Executing: {}", cmd_str);
+        return true;
     } else {
         let status = command.status().expect("Failed to execute command!");
         if !status.success() {
-            eprintln!("Error executing command");
+            eprintln!("Error executing command on {}", command_to_string(command));
             std::process::exit(1);
         }
+        return status.success();
     }
 }
 
-fn has_changes() -> io::Result<bool> {
-    let output = Command::new("git")
-    .arg("status")
-    .arg("--porcelain")
-    .output()?;
+async fn clone(directory: &str, branch: String, regex: &str, config: Config) {
+    // 1. Get current active profile
+    // 2. Have branch as parameter
+    // 3. find amount of repositories
+    // 4. divide by thread max for multithreading
+    // 5. find all repositories divided by thread
+    // 6. filter repos by regex
+    // 7. clone all in targetbasepath
+    let active_profile: Profile = config.active_profile().clone();
+    let pat: Option<String> = Some(active_profile.token);
+    let provider_type: &str = &active_profile.managertype;
+    // Find amount of repositories
+    let provider: Box<dyn GitProvider> = match provider_type {
+        "gitlab" => Box::new(GitLab),
+        _ => panic!("Unknown provider type")
+    };
+    let all_repos: Vec<gitlab::GitlabRepo> = provider.get_repos(&pat, &active_profile.baseaddress, directory);//gitlab::get_gitlab_repos_paralell(pages, &pat, &active_profile.baseaddress, directory).await;
+    
+    let num_threads = std::thread::available_parallelism().unwrap().into();
+    let re = Regex::new(regex).expect("Invalid regex pattern");
+    let repos_to_clone: Vec<gitlab::GitlabRepo> = all_repos.into_iter().filter(|repo| re.is_match(&repo.http_url_to_repo) || re.is_match(&repo.ssh_url_to_repo)).collect();
+    run_in_threads(num_threads, repos_to_clone, move |thread_id: usize, repo: &gitlab::GitlabRepo| {
+        let destination_path: String = format!("{}/{}", active_profile.targetbasepath, repo.path_with_namespace);
+        let clone_url = if active_profile.pulloption == "ssh" {
+            &repo.ssh_url_to_repo
+        } else {
+            &repo.http_url_to_repo
+        };
+        if Path::new(&destination_path).exists() {
+            let mut current_branch = branch.clone();
+            if branch == "" {
+                let (symbolic_ref, success) = run_cmd_o_soft(Command::new("git").args(&["-C", &destination_path, "symbolic-ref", "refs/remotes/origin/HEAD", "--short"]), TEST);
+                if !success {
+                    return; //HERE maybe an println as information?
+                }
+                current_branch = symbolic_ref.strip_prefix("origin/").unwrap().to_string();
+            }
+            let branch_exists = run_cmd_o(Command::new("git").args(&["-C", &destination_path, "ls-remote", "--heads", "origin", &current_branch]), TEST);
+            if branch_exists != "" {
+                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "checkout", &current_branch]).stdout(Stdio::null()).stderr(Stdio::null()), TEST);
+                //HERE only git pull the shit out of it
+                run_cmd_s(Command::new("git").args(&["-C", &destination_path, "pull"]).stdout(Stdio::null()).stderr(Stdio::null()), TEST);
+                println!("Repo: {} successfully pulled!", clone_url);
+            }
+            return;
+        }
 
-    if output.status.success() {
-        // Check if there is any output
-        Ok(!output.stdout.is_empty())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(io::Error::new(io::ErrorKind::Other, format!("Failed to run git status: {}", stderr)))
-    }
+        let status = run_cmd_s(Command::new("git").args(&create_pull_request_args(&branch, &clone_url, &active_profile.targetbasepath, &repo.path_with_namespace))/*.stdout(Stdio::null()).stderr(Stdio::null()) */, TEST);
+        if status {
+            println!("Repo: {} successfully cloned!", clone_url);
+        }
+    });
+    println!("Finished cloning repositories");
 }
 
-fn clone(directory: &str, force: bool) {
-    println!("Cloning into directory: {}", directory);
-    if force {
-        println!("Force option is enabled.");
+fn create_pull_request_args(branch: &str, clone_url: &str, target_basepath: &str, directory: &str) -> Vec<String> {
+    let mut args = vec!["clone".to_string(), clone_url.to_string(), format!("{}/{}", target_basepath, directory)];
+
+    if branch != "" {
+        args.insert(1, "-b".to_string());
+        args.insert(2, branch.to_string());
     }
-    // Implement your clone logic here
+    return args;
 }
 
+//TODO: is reclone really necessary? Clone does the trick and pulls if necessary.
 fn reclone(directory: &str, force: bool) {
     println!("Recloning into directory: {}", directory);
     if force {
@@ -362,12 +386,12 @@ fn reclone(directory: &str, force: bool) {
 }
 
 fn find_git_repos_parallel(root: Option<&Path>, pattern: &str) -> Vec<PathBuf> {
-    let root = root.unwrap_or(Path::new("."));
+    let root: &Path = root.unwrap_or(Path::new("."));
     if pattern == "false" {
         return vec![root.to_path_buf()];
  
     }
-    let regex = Regex::new(pattern).expect("Invalid regex pattern");
+    let regex: Regex = Regex::new(pattern).expect("Invalid regex pattern");
 
     WalkDir::new(root)
         .into_iter()
@@ -388,6 +412,8 @@ fn find_git_repos_parallel(root: Option<&Path>, pattern: &str) -> Vec<PathBuf> {
         .collect()
 }
 
+
+
 fn push_to_origin(repo_path: &str, branch: &str, set_upstream: bool) -> Vec<String> {
 
     let mut args = vec!["-C".to_string(), repo_path.to_string(), "push".to_string(), "origin".to_string(), branch.to_string()];
@@ -397,4 +423,43 @@ fn push_to_origin(repo_path: &str, branch: &str, set_upstream: bool) -> Vec<Stri
     }
 
     return args;
+}
+
+fn run_in_threads<F, T, R>(num_threads: usize, items: Vec<T>, task: F) -> Vec<R>
+where
+    F: Fn(usize, &T) -> R + Send + Sync + 'static,
+    T: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    let task: Arc<F> = Arc::new(task);
+    let items: Arc<Vec<T>> = Arc::new(items);
+    let (tx_result, rx_result) = mpsc::channel();
+
+    let mut handles: Vec<thread::JoinHandle<()>> = vec![];
+
+    for thread_id in 0..num_threads {
+        let task: Arc<F> = Arc::clone(&task);
+        let items: Arc<Vec<T>> = Arc::clone(&items);
+        let tx_result: mpsc::Sender<R> = tx_result.clone();
+        let handle: thread::JoinHandle<()> = thread::spawn(move || {
+            for i in (thread_id..items.len()).step_by(num_threads) {
+                let item: &T = &items[i];
+                let result: R = task(thread_id, item);
+                tx_result.send(result).expect("Failed to send result");
+            }
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().expect("Thread panicked");
+    }
+
+    drop(tx_result); // Close the channel
+    let mut results: Vec<R> = Vec::new();
+    for result in rx_result {
+        results.push(result);
+    }
+
+    results
 }
