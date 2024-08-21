@@ -205,11 +205,17 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
                         Ok(choice) => match choice.to_lowercase().as_str() {
                             "y" => {
                                 let profile_keys = config.find_profiles_by_provider(&remote_origin_url);
-                                let selected_profile_key: Result<&str, InquireError> = Select::new("Which profile do you choose?", profile_keys).prompt();
-                                let profile = match selected_profile_key {
-                                    Ok(choice) => config.profiles.get(choice).unwrap(),
-                                    Err(_) => config.active_profile(),
+                                let profile = if profile_keys.len() == 1 {
+                                    config.profiles.get(&profile_keys.first().unwrap().to_string()).unwrap()
+                                } else {
+                                    let selected_profile_key: Result<&str, InquireError> = Select::new("Which profile do you choose?", profile_keys).prompt();
+                                    let chosen_profile = match selected_profile_key {
+                                        Ok(choice) => config.profiles.get(choice).unwrap(),
+                                        Err(_) => config.active_profile(),
+                                    };
+                                    chosen_profile
                                 };
+                                
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.name", &profile.username]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.email", &profile.email]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "add", "."]), TEST);
