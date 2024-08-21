@@ -215,7 +215,7 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
                                     };
                                     chosen_profile
                                 };
-                                
+                                println!("test");
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.name", &profile.username]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "config", "user.email", &profile.email]), TEST);
                                 run_cmd_s(Command::new("git").args(&["-C", &repo.clone().into_os_string().into_string().unwrap(), "add", "."]), TEST);
