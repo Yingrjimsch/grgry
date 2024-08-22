@@ -1,8 +1,8 @@
+use colored::Colorize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use colored::Colorize;
 use toml_edit::{value, DocumentMut};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Profile {
@@ -38,7 +38,9 @@ impl Config {
 
     fn load_profiles(config_file_path: &str) -> HashMap<String, Profile> {
         let toml_content = fs::read_to_string(config_file_path).expect("Failed to read file");
-        let doc = toml_content.parse::<DocumentMut>().expect("Failed to parse TOML");
+        let doc = toml_content
+            .parse::<DocumentMut>()
+            .expect("Failed to parse TOML");
 
         //TODO on load check if not empty (VALID)
         let mut profiles = HashMap::new();
@@ -49,7 +51,7 @@ impl Config {
                 username: value["username"].as_str().unwrap_or("").to_string(),
                 email: value["email"].as_str().unwrap_or("").to_string(),
                 baseaddress: value["baseaddress"].as_str().unwrap_or("").to_string(),
-                targetbasepath: value["targetbasepath"].as_str().unwrap_or("").to_string(), 
+                targetbasepath: value["targetbasepath"].as_str().unwrap_or("").to_string(),
                 provider: value["provider"].as_str().unwrap_or("").to_string(),
                 token: value["token"].as_str().unwrap_or("").to_string(),
             };
@@ -74,8 +76,11 @@ impl Config {
 
     // Saves the current state of profiles back to the config file
     pub fn save_config(&self) {
-        let mut toml_content = fs::read_to_string(&self.config_file_path).expect("Failed to read file");
-        let mut doc = toml_content.parse::<DocumentMut>().expect("Failed to parse TOML");
+        let mut toml_content =
+            fs::read_to_string(&self.config_file_path).expect("Failed to read file");
+        let mut doc = toml_content
+            .parse::<DocumentMut>()
+            .expect("Failed to parse TOML");
 
         // Remove profiles that are no longer in the HashMap
         let existing_keys: Vec<String> = doc.iter().map(|(key, _)| key.to_string()).collect();

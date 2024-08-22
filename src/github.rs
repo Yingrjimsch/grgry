@@ -3,7 +3,10 @@ use reqwest::Response;
 use serde::Deserialize;
 use tokio::task::block_in_place;
 
-use crate::{config::Profile, git_providers::{call_api, get_repos_paralell, GitProvider, Repo}};
+use crate::{
+    config::Profile,
+    git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
+};
 const PER_PAGE: i16 = 100;
 
 #[derive(Debug, Deserialize)]
@@ -29,29 +32,50 @@ impl Repo for GithubRepo {
 
 pub struct Github;
 impl GitProvider for Github {
-    fn get_repos(&self, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile) -> Vec<Box<dyn Repo>> {
+    fn get_repos(
+        &self,
+        pat: &Option<String>,
+        collection_name: &str,
+        user: bool,
+        active_profile: Profile,
+    ) -> Vec<Box<dyn Repo>> {
         block_in_place(|| {
             let future = async {
                 let collection_searchstring = match user {
-                    true => if active_profile.username == collection_name && active_profile.token != "" {
-                        "user"
-                    } else {
-                        &format!("users/{}", collection_name)
-                    },
-                    false => &format!("orgs/{}", collection_name)
+                    true => {
+                        if active_profile.username == collection_name && active_profile.token != ""
+                        {
+                            "user"
+                        } else {
+                            &format!("users/{}", collection_name)
+                        }
+                    }
+                    false => &format!("orgs/{}", collection_name),
                 };
-                let endpoint: String = format!("{}/{}/repos", &active_profile.baseaddress, collection_searchstring); //here the replace / --> %2F is not done because Github projects are top level on org or on user
+                let endpoint: String = format!(
+                    "{}/{}/repos",
+                    &active_profile.baseaddress, collection_searchstring
+                ); //here the replace / --> %2F is not done because Github projects are top level on org or on user
                 let headers: Option<Vec<(String, String)>> = match pat {
-                    Some(token) => Some(vec![("Authorization".to_string(), token.clone()), ("User-Agent".to_string(), "grgry".to_string())]),
+                    Some(token) => Some(vec![
+                        ("Authorization".to_string(), token.clone()),
+                        ("User-Agent".to_string(), "grgry".to_string()),
+                    ]),
                     None => None,
                 };
                 let pages: i32 = self.get_page_number(&endpoint, headers.clone());
-                let parameters: Option<Vec<(String, String)>> = Some(vec![
-                    ("per_page".to_string(), PER_PAGE.to_string()),
-                ]);
-                get_repos_paralell(pages, &endpoint, parameters, headers, &active_profile.provider).await
+                let parameters: Option<Vec<(String, String)>> =
+                    Some(vec![("per_page".to_string(), PER_PAGE.to_string())]);
+                get_repos_paralell(
+                    pages,
+                    &endpoint,
+                    parameters,
+                    headers,
+                    &active_profile.provider,
+                )
+                .await
             };
-    
+
             // Block on the async task, so it runs to completion and returns the result.
             let repos = tokio::runtime::Handle::current().block_on(future);
             repos
@@ -65,13 +89,21 @@ impl GitProvider for Github {
                     ("page".to_string(), "1".to_string()),
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
-                let resp_total_repos: Response = call_api(endpoint, parameters.as_deref(), headers.as_deref()).await;
+                let resp_total_repos: Response =
+                    call_api(endpoint, parameters.as_deref(), headers.as_deref()).await;
                 let pages = match resp_total_repos.headers().get("link") {
                     Some(page) => {
                         let re = Regex::new(r"page=(\d+)").unwrap();
-                        re.captures_at(page.to_str().ok().unwrap(), 3).unwrap().get(1).unwrap().as_str().parse::<i32>().ok().unwrap()
-                    },
-                    None => 1
+                        re.captures_at(page.to_str().ok().unwrap(), 3)
+                            .unwrap()
+                            .get(1)
+                            .unwrap()
+                            .as_str()
+                            .parse::<i32>()
+                            .ok()
+                            .unwrap()
+                    }
+                    None => 1,
                 };
                 return pages;
             };

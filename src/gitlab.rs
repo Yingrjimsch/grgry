@@ -1,4 +1,8 @@
-use crate::{config::Profile, git_providers::{call_api, get_repos_paralell, GitProvider, Repo}, github::GithubRepo};
+use crate::{
+    config::Profile,
+    git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
+    github::GithubRepo,
+};
 
 use reqwest::Response;
 use serde::Deserialize;
@@ -9,7 +13,7 @@ const PER_PAGE: i16 = 100;
 pub(crate) struct GitlabRepo {
     pub ssh_url_to_repo: String,
     pub http_url_to_repo: String,
-    pub path_with_namespace: String
+    pub path_with_namespace: String,
 }
 
 impl Repo for GitlabRepo {
@@ -28,16 +32,30 @@ impl Repo for GitlabRepo {
 
 pub struct Gitlab;
 impl GitProvider for Gitlab {
-    fn get_repos(&self, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile) -> Vec<Box<dyn Repo>> {
+    fn get_repos(
+        &self,
+        pat: &Option<String>,
+        collection_name: &str,
+        user: bool,
+        active_profile: Profile,
+    ) -> Vec<Box<dyn Repo>> {
         block_in_place(|| {
             let future = async {
                 let collection_type = match user {
                     true => "users",
-                    false => "groups"
+                    false => "groups",
                 };
-                let endpoint: String = format!("{}/api/v4/{}/{}/projects", active_profile.baseaddress, collection_type, collection_name.replace("/", "%2F"));
+                let endpoint: String = format!(
+                    "{}/api/v4/{}/{}/projects",
+                    active_profile.baseaddress,
+                    collection_type,
+                    collection_name.replace("/", "%2F")
+                );
                 let headers: Option<Vec<(String, String)>> = match pat {
-                    Some(token) => Some(vec![("Private-Token".to_string(), token.clone()), ("User-Agent".to_string(), "grgry".to_string())]),
+                    Some(token) => Some(vec![
+                        ("Private-Token".to_string(), token.clone()),
+                        ("User-Agent".to_string(), "grgry".to_string()),
+                    ]),
                     None => None,
                 };
                 let pages: i32 = self.get_page_number(&endpoint, headers.clone());
@@ -46,9 +64,16 @@ impl GitProvider for Gitlab {
                     ("simple".to_string(), "true".to_string()),
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
-                get_repos_paralell(pages, &endpoint, parameters, headers, &active_profile.provider).await
+                get_repos_paralell(
+                    pages,
+                    &endpoint,
+                    parameters,
+                    headers,
+                    &active_profile.provider,
+                )
+                .await
             };
-    
+
             // Block on the async task, so it runs to completion and returns the result.
             let repos = tokio::runtime::Handle::current().block_on(future);
             repos
@@ -64,8 +89,14 @@ impl GitProvider for Gitlab {
                     ("page".to_string(), "1".to_string()),
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
-                let resp_total_repos: Response = call_api(endpoint, parameters.as_deref(), headers.as_deref()).await;
-                return resp_total_repos.headers().get("x-total-pages").and_then(|hv| hv.to_str().ok()).and_then(|s| s.parse::<i32>().ok()).unwrap();
+                let resp_total_repos: Response =
+                    call_api(endpoint, parameters.as_deref(), headers.as_deref()).await;
+                return resp_total_repos
+                    .headers()
+                    .get("x-total-pages")
+                    .and_then(|hv| hv.to_str().ok())
+                    .and_then(|s| s.parse::<i32>().ok())
+                    .unwrap();
             };
             // Block on the async task, so it runs to completion and returns the result.
             let repos = tokio::runtime::Handle::current().block_on(future);
@@ -73,4 +104,3 @@ impl GitProvider for Gitlab {
         })
     }
 }
-

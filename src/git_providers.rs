@@ -1,6 +1,9 @@
 use std::process;
 
-use reqwest::{header::{HeaderMap, HeaderName, HeaderValue}, Client, Response};
+use reqwest::{
+    header::{HeaderMap, HeaderName, HeaderValue},
+    Client, Response,
+};
 use tokio::task;
 
 use crate::{config::Profile, github::GithubRepo, gitlab::GitlabRepo};
@@ -8,7 +11,13 @@ use crate::{config::Profile, github::GithubRepo, gitlab::GitlabRepo};
 // Define the trait in a common file (e.g., `git_provider.rs`)
 pub trait GitProvider {
     fn get_page_number(&self, endpoint: &str, headers: Option<Vec<(String, String)>>) -> i32;
-    fn get_repos(&self, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile) -> Vec<Box<dyn Repo>>;
+    fn get_repos(
+        &self,
+        pat: &Option<String>,
+        collection_name: &str,
+        user: bool,
+        active_profile: Profile,
+    ) -> Vec<Box<dyn Repo>>;
 }
 
 pub trait Repo: Send + Sync {
@@ -17,16 +26,15 @@ pub trait Repo: Send + Sync {
     fn full_path(&self) -> &str;
 }
 
-
 pub async fn get_repos_paralell(
     pages: i32,
     endpoint: &str,
     parameters: Option<Vec<(String, String)>>,
     headers: Option<Vec<(String, String)>>,
-    provider: &str,  // Enum to distinguish between Github and Gitlab
+    provider: &str, // Enum to distinguish between Github and Gitlab
 ) -> Vec<Box<dyn Repo>> {
     let mut tasks: Vec<task::JoinHandle<Result<Vec<Box<dyn Repo>>, reqwest::Error>>> = Vec::new();
-    
+
     for page in 1..=pages {
         let endpoint_clone = endpoint.to_string();
         let mut parameters_clone = parameters.clone();
@@ -37,18 +45,26 @@ pub async fn get_repos_paralell(
         }
 
         tasks.push(task::spawn(async move {
-            let response: Response = call_api(&endpoint_clone, parameters_clone.as_deref(), headers_clone.as_deref()).await;
-            println!("{:?}", response);
+            let response: Response = call_api(
+                &endpoint_clone,
+                parameters_clone.as_deref(),
+                headers_clone.as_deref(),
+            )
+            .await;
             let repos: Vec<Box<dyn Repo>> = match provider.as_str() {
-                "gitlab" => response.json::<Vec<GitlabRepo>>().await?
+                "gitlab" => response
+                    .json::<Vec<GitlabRepo>>()
+                    .await?
                     .into_iter()
                     .map(|repo| Box::new(repo) as Box<dyn Repo>)
                     .collect(),
-                "github" => response.json::<Vec<GithubRepo>>().await?
+                "github" => response
+                    .json::<Vec<GithubRepo>>()
+                    .await?
                     .into_iter()
                     .map(|repo| Box::new(repo) as Box<dyn Repo>)
                     .collect(),
-                _ => unreachable!()
+                _ => unreachable!(),
             };
             Ok::<Vec<Box<dyn Repo>>, reqwest::Error>(repos)
         }));
@@ -63,10 +79,14 @@ pub async fn get_repos_paralell(
     all_repos
 }
 
-pub async fn call_api(endpoint: &str, parameters: Option<&[(String, String)]>, headers: Option<&[(String, String)]>) -> Response {
+pub async fn call_api(
+    endpoint: &str,
+    parameters: Option<&[(String, String)]>,
+    headers: Option<&[(String, String)]>,
+) -> Response {
     let client = Client::builder().build().expect("error while build client");
     let mut request = client.get(endpoint);
-        // .header("User-Agent", "grgry-cli"); //TODO: check if user agent makes sense
+    // .header("User-Agent", "grgry-cli"); //TODO: check if user agent makes sense
     if let Some(params) = parameters {
         request = request.query(params)
     }
