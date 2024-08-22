@@ -1,0 +1,8 @@
+{
+    "verifyConditions": "@semantic-release/github",
+    "prepare": false,
+    "publish": "@semantic-release/github",
+    "success": false,
+    "fail": false,
+    "branches": ["master", "main"]
+}
