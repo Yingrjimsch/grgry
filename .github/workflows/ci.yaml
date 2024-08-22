@@ -31,6 +31,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v3
+        uses: cycjimmy/semantic-release-action@v4
         env:
-          GITHUB_TOKEN: ${{ secrets.GHA_GRGRY }}
+          GH_TOKEN: ${{ secrets.GHA_GRGRY }}
