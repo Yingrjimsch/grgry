@@ -15,7 +15,7 @@ jobs:
       - pre
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -28,8 +28,13 @@ jobs:
     needs:
       - build
     runs-on: ubuntu-latest
+    environment:
+      name: grgry #your environment name
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v4
         env:
