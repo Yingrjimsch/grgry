@@ -55,9 +55,10 @@ async fn main() {
             directory,
             user,
             branch,
-            regex,
+            regex_args,
         } => {
-            clone(directory, *user, branch.to_string(), regex, config).await;
+            let (regex, reverse) = regex_args.get_regex_args(".*");
+            clone(directory, *user, branch.to_string(), &regex, reverse, config).await;
         }
         Commands::Quick {
             message,
@@ -70,7 +71,6 @@ async fn main() {
         }
         Commands::Mass { command, regex_args, skip_interactive } => {
             let (regex, reverse) = regex_args.get_regex_args(".*");
-            print!("{} {}", regex, reverse);
             mass(command, &regex, reverse, *skip_interactive)
         }
         Commands::Profile { sub } => match &sub {
@@ -518,7 +518,7 @@ fn run_cmd_s(mut command: &mut Command, test: bool, silent: bool) -> bool {
     }
 }
 
-async fn clone(directory: &str, user: bool, branch: String, regex: &str, config: Config) {
+async fn clone(directory: &str, user: bool, branch: String, regex: &str, reverse: bool, config: Config) {
     let active_profile: Profile = config.active_profile().clone();
     let pat: Option<String> = Some(active_profile.clone().token);
     let provider_type: &str = &active_profile.provider;
@@ -532,11 +532,10 @@ async fn clone(directory: &str, user: bool, branch: String, regex: &str, config:
         provider.get_repos(&pat, directory, user, active_profile.clone());
 
     let num_threads = std::thread::available_parallelism().unwrap().into();
-    println!("{}", regex);
     let re = Regex::new(regex).expect("Invalid regex pattern");
     let repos_to_clone: Vec<Box<dyn Repo>> = all_repos
         .into_iter()
-        .filter(|repo| re.is_match(&repo.http_url()) || re.is_match(&repo.ssh_url()))
+        .filter(|repo| (re.is_match(&repo.http_url()) || re.is_match(&repo.ssh_url())) ^ reverse)
         .collect();
     run_in_threads(
         num_threads,

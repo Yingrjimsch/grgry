@@ -28,12 +28,8 @@ pub enum Commands {
         )]
         branch: String,
 
-        #[arg(
-            long,
-            default_value = ".*",
-            help = "Filter the directory via regex (default .*)"
-        )]
-        regex: String,
+        #[clap(flatten)]
+        regex_args: Regex,
     },
     #[command(about = "Make git add, git commit, git push in one go.")]
     Quick {
