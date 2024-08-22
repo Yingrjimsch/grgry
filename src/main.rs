@@ -63,11 +63,12 @@ async fn main() {
             message,
             force,
             mass,
+            skip_interactive,
         } => {
-            quick(message, *force, mass, config);
+            quick(message, *force, mass, *skip_interactive, config);
         }
-        Commands::Mass { command, regex, interactive } => {
-            mass(command, regex, *interactive)
+        Commands::Mass { command, regex, skip_interactive } => {
+            mass(command, regex, *skip_interactive)
         }
         Commands::Profile { sub } => match &sub {
             commands::ProfileCommands::Activate => activate_profile_prompt(&mut config),
@@ -214,7 +215,7 @@ fn activate_profile_prompt(config: &mut Config) {
     let profile_keys: Vec<&str> = profiles_cloned.keys().map(|key| key.as_str()).collect();
 
     let profile_to_activate_key: Result<&str, InquireError> =
-        Select::new("Which profile do you choose?", profile_keys).prompt();
+        Select::new("Choose profile to activate:", profile_keys).prompt();
     match profile_to_activate_key {
         Ok(choice) => {
             config.activate_profile(choice);
@@ -225,15 +226,15 @@ fn activate_profile_prompt(config: &mut Config) {
     }
 }
 
-fn mass(command: &str, regex: &str, interactive: bool) {
+fn mass(command: &str, regex: &str, skip_interactive: bool) {
     let repos = find_git_repos_parallel(None, &regex);
     for repo in repos {
         loop {
             println!(
-                "Repo {} has been found",
-                repo.clone().into_os_string().into_string().unwrap()
+                "{} {}", "Repo has been found at:".green(),
+                repo.clone().into_os_string().into_string().unwrap().green()
             );
-            let allow_mass: Result<String, InquireError> =  if !interactive {
+            let allow_mass: Result<String, InquireError> =  if !skip_interactive {
                 CustomType::<String>::new(&format!(
                 "Do you want to execute {}? (y)es/(n)o:",
                 command
@@ -268,7 +269,7 @@ fn mass(command: &str, regex: &str, interactive: bool) {
 }
 
 //TODO: check profile and switch automatically
-fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Config) {
+fn quick(message: &str, force: bool, mass: &Option<Option<String>>, skip_interactive: bool, config: Config) {
     let mass_val = match mass {
         Some(Some(mass_value)) => mass_value.to_string(), // If the user provided a value, use it
         Some(None) => String::from(".*"), // If the user provided the flag but no value, use ".*"
@@ -291,7 +292,8 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
                     "There are changes in the repository {}",
                     repo.clone().into_os_string().into_string().unwrap()
                 );
-                let allow_quicken = CustomType::<String>::new(
+                let allow_quicken = if !skip_interactive {
+                    CustomType::<String>::new(
                     "Do you want to quicken this repo? (y)es/(n)o/(m)ore information:",
                 )
                 .with_validator(&|input: &String| match input.to_lowercase().as_str() {
@@ -301,7 +303,10 @@ fn quick(message: &str, force: bool, mass: &Option<Option<String>>, config: Conf
                     )),
                 })
                 .with_error_message(&"Please type 'y', 'n', or 'm'.".red())
-                .prompt();
+                .prompt()
+                } else {
+                    Ok("y".to_string())
+                };
                 let remote_origin_url = run_cmd_o(
                     Command::new("git").args(&[
                         "-C",

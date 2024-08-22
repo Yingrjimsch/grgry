@@ -47,6 +47,9 @@ pub enum Commands {
 
         #[arg(long, value_parser, num_args(0..=1), help = "Quicken multiple repos at the same time, use --mass or --mass <regex>")]
         mass: Option<Option<String>>,
+
+        #[arg(short, long, default_value_t = false, help = "Don't ask for permission to execute command per repository")]
+        skip_interactive: bool,
     },
     Mass {
         #[arg(
@@ -63,8 +66,8 @@ pub enum Commands {
         )]
         regex: String,
 
-        #[arg(short, long, default_value_t = false)]
-        interactive: bool,
+        #[arg(short, long, default_value_t = false, help = "Don't ask for permission to execute command per repository")]
+        skip_interactive: bool,
     },
     Profile {
         #[clap(subcommand)]
