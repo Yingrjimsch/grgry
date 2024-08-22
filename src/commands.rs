@@ -1,3 +1,5 @@
+use std::default;
+
 use clap::Subcommand;
 #[derive(Subcommand)]
 pub enum Commands {
@@ -45,8 +47,8 @@ pub enum Commands {
         #[arg(short, long, default_value_t = false)]
         force: bool,
 
-        #[arg(long, value_parser, num_args(0..=1), help = "Quicken multiple repos at the same time, use --mass or --mass <regex>")]
-        mass: Option<Option<String>>,
+        #[clap(flatten)]
+        regex_args: Regex,
 
         #[arg(short, long, default_value_t = false, help = "Don't ask for permission to execute command per repository")]
         skip_interactive: bool,
@@ -59,12 +61,8 @@ pub enum Commands {
         )]
         command: String,
 
-        #[arg(
-            value_name = "REGEX",
-            default_value = ".*",
-            help = "Filter the repositories via regex (default .*)"
-        )]
-        regex: String,
+        #[clap(flatten)]
+        regex_args: Regex,
 
         #[arg(short, long, default_value_t = false, help = "Don't ask for permission to execute command per repository")]
         skip_interactive: bool,
@@ -80,4 +78,33 @@ pub enum ProfileCommands {
     Activate,
     Add,
     Delete,
+}
+
+#[derive(Debug, clap::Args)]
+#[group(multiple = false)]
+pub struct Regex {
+    /// Argument1.
+    #[clap(long, value_parser, num_args(0..=1),
+        help = "Use regex to execute command en mass. Without option it searches for all repos.")]
+    regex: Option<Option<String>>,
+    /// Argument2.
+    #[clap(long,
+        help = "Use regex to execute command en mass excluding matching repos.")]
+    rev_regex: Option<String>,
+}
+
+impl Regex {
+    pub fn get_regex_args(&self, default: &str) -> (String, bool) {
+        // Determine the value and whether reverse is true
+        if let Some(rev_regex) = &self.rev_regex {
+            (rev_regex.clone(), true)
+        } else if let Some(regex) = &self.regex {
+            match regex {
+                Some(pattern) => (pattern.to_string(), false), // If the user provided a value, use it
+                None => (String::from(".*"), false), // If the user provided the flag but no value, use ".*"
+            }
+        } else {
+            (default.to_string(), false)
+        }
+    }
 }

@@ -62,13 +62,16 @@ async fn main() {
         Commands::Quick {
             message,
             force,
-            mass,
+            regex_args,
             skip_interactive,
         } => {
-            quick(message, *force, mass, *skip_interactive, config);
+            let (regex, reverse) = regex_args.get_regex_args("false");
+            quick(message, *force, &regex, reverse, *skip_interactive, config);
         }
-        Commands::Mass { command, regex, skip_interactive } => {
-            mass(command, regex, *skip_interactive)
+        Commands::Mass { command, regex_args, skip_interactive } => {
+            let (regex, reverse) = regex_args.get_regex_args(".*");
+            print!("{} {}", regex, reverse);
+            mass(command, &regex, reverse, *skip_interactive)
         }
         Commands::Profile { sub } => match &sub {
             commands::ProfileCommands::Activate => activate_profile_prompt(&mut config),
@@ -226,8 +229,8 @@ fn activate_profile_prompt(config: &mut Config) {
     }
 }
 
-fn mass(command: &str, regex: &str, skip_interactive: bool) {
-    let repos = find_git_repos_parallel(None, &regex);
+fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool) {
+    let repos = find_git_repos_parallel(None, &regex, reverse);
     for repo in repos {
         loop {
             println!(
@@ -269,13 +272,13 @@ fn mass(command: &str, regex: &str, skip_interactive: bool) {
 }
 
 //TODO: check profile and switch automatically
-fn quick(message: &str, force: bool, mass: &Option<Option<String>>, skip_interactive: bool, config: Config) {
-    let mass_val = match mass {
-        Some(Some(mass_value)) => mass_value.to_string(), // If the user provided a value, use it
-        Some(None) => String::from(".*"), // If the user provided the flag but no value, use ".*"
-        None => String::from("false"), // If the user didn't provide the flag, use "false" meaning only current folder
-    };
-    let repos = find_git_repos_parallel(None, &mass_val);
+fn quick(message: &str, force: bool, regex: &str, reverse: bool, skip_interactive: bool, config: Config) {
+    // let mass_val = match mass {
+    //     Some(Some(mass_value)) => mass_value.to_string(), // If the user provided a value, use it
+    //     Some(None) => String::from(".*"), // If the user provided the flag but no value, use ".*"
+    //     None => String::from("false"), // If the user didn't provide the flag, use "false" meaning only current folder
+    // };
+    let repos = find_git_repos_parallel(None, regex, reverse);
     for repo in repos {
         let has_changes = run_cmd_o(
             Command::new("git").args(&[
@@ -637,7 +640,7 @@ fn create_pull_request_args(
     return args;
 }
 
-fn find_git_repos_parallel(root: Option<&Path>, pattern: &str) -> Vec<PathBuf> {
+fn find_git_repos_parallel(root: Option<&Path>, pattern: &str, reverse: bool) -> Vec<PathBuf> {
     let root: &Path = root.unwrap_or(Path::new("."));
     if pattern == "false" {
         return vec![root.to_path_buf()];
@@ -657,7 +660,7 @@ fn find_git_repos_parallel(root: Option<&Path>, pattern: &str) -> Vec<PathBuf> {
         .filter(|entry| {
             let path_str = entry.path().to_string_lossy();
             // Check if the path matches the regex pattern
-            regex.is_match(&path_str)
+            regex.is_match(&path_str) ^ reverse
         })
         .map(|entry| entry.into_path())
         .collect()
