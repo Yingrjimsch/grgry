@@ -14,7 +14,7 @@ jobs:
         run: |
           echo grgry ci/cd pipeline is triggered.
   # This workflow contains a single job called "build"
-  pyinstaller-build-windows:
+  release:
     needs: 
       - pre
     runs-on: ${{ matrix.os }}
@@ -43,7 +43,12 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Get the release version from the tag
         shell: bash
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV  cargo install cross --git https://github.com/cross-rs/cross
+      - name: Reinstall Cross
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cross --git https://github.com/cross-rs/cross
       - name: Build
         uses: actions-rs/cargo@v1
         with:
