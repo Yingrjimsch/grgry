@@ -1,7 +1,12 @@
 name: CI
 
 # Controls when the workflow will run
-on: [push, workflow_dispatch]
+on: 
+  push:
+    branches:
+      - '**'  # Matches all branches
+    tags-ignore:
+      - '**'  # Ignores all tag pushes
 jobs:
   pre:
     runs-on: ubuntu-latest
