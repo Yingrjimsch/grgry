@@ -54,6 +54,7 @@ pub enum Commands {
         )]
         skip_interactive: bool,
     },
+    #[command(about = "Execute a git command on a mass of repos.")]
     Mass {
         #[arg(
             value_name = "COMMAND",
@@ -73,6 +74,7 @@ pub enum Commands {
         )]
         skip_interactive: bool,
     },
+    #[command(about = "Manage your grgry profiles for different providers like github and gitlab.")]
     Profile {
         #[clap(subcommand)]
         sub: ProfileCommands,
@@ -81,8 +83,11 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum ProfileCommands {
+    #[command(about = "Activate a profile to use.")]
     Activate,
+    #[command(about = "Adding a profile interactively.")]
     Add,
+    #[command(about = "Remove a unused or wrong profile.")]
     Delete,
 }
 

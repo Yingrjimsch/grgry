@@ -1,6 +1,13 @@
 [package]
 name = "grgry"
-version = "0.0.1"
+version = "1.0.0"
+authors = ["nobel98@bluewin.ch"]
+repository = "https://github.com/yingrjimsch/grgry"
+keywords = ["git", "mass", "regex", "repository-management"]
+categories = ["command-line-utilities", "development-tools"]
+license = "MIT"
+readme = "README.md"
+description = "A git management tool for mass repos"
 edition = "2021"
 
 [dependencies]

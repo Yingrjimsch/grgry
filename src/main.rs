@@ -31,10 +31,12 @@ use tokio::time::error::Elapsed;
 use walkdir::WalkDir;
 
 const TEST: bool = false;
+const VERSION: &str = "1.0.0";
 
 #[derive(Parser)]
 #[command(name = "grgry")]
-#[command(about = "A CLI tool for various tasks", long_about = None)]
+#[command(about = "A CLI tool for git en mass", long_about = None)]
+#[command(version = VERSION)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

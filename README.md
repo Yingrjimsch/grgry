@@ -20,42 +20,53 @@ grgry is particularly helpful if you need to:
 ##  Setup
 
 ###  Installation
-You can install grgry via 
-```bash
-cargo  install  grgry
-```
-or by [downloading](#) the binaries directly.
+You can install grgry by [downloading](https://github.com/yingrjimsch/grgry/releases) the binaries directly.
+
+After that you can move it into your `/usr/local/bin` directory to make it executable on linux or add it to your environment variables on windows.
+
 
 ##  Create Config File
+The configuration file should be created the first time you execute the `grgry` command.
 
-Create a configuration file named ***grgry.toml*** inside the ***.config*** folder in your **$HOME** directory
+
+If you want to manually create a configuration file, add a file named ***grgry.toml*** inside the ***.config*** folder in your **$HOME** directory
 ```bash
 touch /home/user/.config/grgry.toml
 ```
 ```bash
 touch ~/.config/grgry.toml
 ```
- This config file stores your [profiles](#Profile) , which you can switch between to access the correct provider with the appropriate user.
+ This config file stores your [profiles](#Profile), which you can switch between to access the correct provider with the appropriate user.
   
 ## Available Commands
 
 ### Clone
 The `grgry clone` command can clone a group, user, or organization. It accepts the following parameters:
-- `directory`: Name of the group/org/user.
+- `directory`: (Required) Name of the group/org/user to clone .
+- `-u, --user`: (Optional) Specify if the directory is a user directory or not (default false).
+- `-b, --branch`: (Optional) Clone specific branch (if not specified the deefault branch is cloned).
 - `--regex`: (Optional) Filter repositories to clone using a regex pattern.
-- `-u, --user`: (Optional) Specify thet the repositories of a user should be cloned (default is false).
-- `-b, --branch`: (Optional) Specify which branch to pull (default HEAD)
+- `--rev-regex`: (Optional) Filter repositories to clone using a regex pattern exclusion.
 
 If a repository does not match the provided branch or regex pattern, it will be skipped.
 
 ### Quick
-The `quick` command performs `git add`, `git commit`, and `git push` on one or many repositories together. It accepts the following parameters:
--   `message`: Commit message (required).
--   `--mass`: (Optional) Use regex to specify repositories to include.
--   `--no-interactive`: (Optional) When enabled, processes all repositories without prompting for confirmation (default is false).
--   `-b, --branch`: (Optional) Specify which branch to apply the operation on (default is current branch).
+The `grgry quick` command performs `git add`, `git commit`, and `git push` on one or many repositories together. It accepts the following parameters:
+- `message`: (Required) Commit message same as `git commit -m message`.
+- `--regex`: (Optional) Filter repositories to clone using a regex pattern.
+- `--rev-regex`: (Optional) Filter repositories to clone using a regex pattern exclusion.
+- `-s, --skip-interactive`: Don't ask for permission to execute command per repository (default is false).
 
-If a repository does not match the provided branch or regex pattern, it will be skipped.
+If a repository does not match the regex pattern or has no changes, it will be skipped. 
+If a local branch is not on the origin it will be pushed using `--set-upstream`.
+If you want to know more about what changed you can type `m` on the interactive mode which returns the `git diff` of the repository.
+
+### Mass
+The `grgry mass` command can be used for executing single line git commands for multiple repositories at once (e.g. `git status --porcelain` --> `grgry "status --porcelain`) It accepts the following parameters:
+- `command`: (Required) This is the command to execute as if it was a git command without git prefix.
+- `--regex`: (Optional) Filter repositories to clone using a regex pattern.
+- `--rev-regex`: (Optional) Filter repositories to clone using a regex pattern exclusion.
+- `-s, --skip-interactive`: Don't ask for permission to execute command per repository (default is false).
 
 ### Profile
 
@@ -87,10 +98,6 @@ targetbasepath = "/your/base/repo/path"
 -  `activate`:  Activate a specific profile to be used for cloning.
 -  `add`:  Add a new profile interactively. Note: You'll be prompted to provide a personal access token for the provider. Without the token, you'll only be able to clone public repositories.
 -  `delete`:  Delete a profile that is not in use or is incorrectly configured.
-
-### Mass (Experimental)
-
-The `grgry mass` command lets you translate any git command into a mass-executable command. You can specify the git command (without the `git` prefix) and use a regex to determine which repositories the command should be executed on.
 
 ## Contributions
 
