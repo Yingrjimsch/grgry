@@ -1,7 +1,9 @@
 use colored::Colorize;
+use dirs::home_dir;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs;
+use std::path::Path;
+use std::{collections::HashMap, path::PathBuf};
+use std::fs::{self, File};
 use toml_edit::{value, DocumentMut};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -19,24 +21,42 @@ pub struct Profile {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
     pub profiles: HashMap<String, Profile>,
-    config_file_path: String,
+    config_file_path: PathBuf,
 }
 
 impl Config {
     // Creates a new Config by loading the profiles from the given file
-    pub fn new(config_file_path: &str) -> Self {
-        let profiles = Self::load_profiles(config_file_path);
+    pub fn new() -> Self {
+        let config_file_path = Self::get_default_config_path();
+        if !config_file_path.exists() {
+            Self::create_empty_config_file(&config_file_path);
+        }
+        let profiles = Self::load_profiles(&config_file_path);
         Config {
             profiles,
-            config_file_path: config_file_path.to_string(),
+            config_file_path,
         }
+    }
+
+    fn get_default_config_path() -> PathBuf {
+        let mut config_path = home_dir().expect("Failed to get home directory");
+        config_path.push(".config");
+        config_path.push("grgry.toml");
+        config_path
+    }
+
+    fn create_empty_config_file(config_file_path: &Path) {
+        if let Some(parent) = config_file_path.parent() {
+            fs::create_dir_all(parent).expect("Failed to create config directory");
+        }
+        File::create(config_file_path).expect("Failed to create config file");
     }
 
     pub fn reload(&mut self) {
         self.profiles = Self::load_profiles(&self.config_file_path);
     }
 
-    fn load_profiles(config_file_path: &str) -> HashMap<String, Profile> {
+    fn load_profiles<P: AsRef<Path>>(config_file_path: P) -> HashMap<String, Profile> {
         let toml_content = fs::read_to_string(config_file_path).expect("Failed to read file");
         let doc = toml_content
             .parse::<DocumentMut>()
@@ -123,7 +143,7 @@ impl Config {
         match self.profiles.values().find(|profile| profile.active) {
             Some(profile) => profile,
             None => {
-                eprintln!("{}", "One profile needs to be activated. For activating a profile use grgry activate!".red());
+                eprintln!("{}", "One profile needs to be activated. For activating a profile use grgry profile activate!".red());
                 std::process::exit(1);
             }
         }

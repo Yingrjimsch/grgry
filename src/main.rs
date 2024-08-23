@@ -18,8 +18,8 @@ use inquire::{error::InquireError, required, CustomType, Select, Text};
 use rayon::prelude::*;
 use rayon::str;
 use regex::Regex;
-use tokio::time::error::Elapsed;
 use std::collections::HashMap;
+use std::path;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::process::Command;
@@ -27,6 +27,7 @@ use std::process::Stdio;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
+use tokio::time::error::Elapsed;
 use walkdir::WalkDir;
 
 const TEST: bool = false;
@@ -41,13 +42,7 @@ struct Cli {
 
 #[tokio::main]
 async fn main() {
-    let mut config = match dirs::home_dir() {
-        Some(path) => Config::new(&format!("{}/.config/grgry.toml", path.to_str().unwrap())),
-        None => {
-            eprintln!("{}", "Could not load config file!".red());
-            process::exit(1);
-        }
-    };
+    let mut config = Config::new();
     let cli = Cli::parse();
 
     match &cli.command {
@@ -58,7 +53,15 @@ async fn main() {
             regex_args,
         } => {
             let (regex, reverse) = regex_args.get_regex_args(".*");
-            clone(directory, *user, branch.to_string(), &regex, reverse, config).await;
+            clone(
+                directory,
+                *user,
+                branch.to_string(),
+                &regex,
+                reverse,
+                config,
+            )
+            .await;
         }
         Commands::Quick {
             message,
@@ -69,7 +72,11 @@ async fn main() {
             let (regex, reverse) = regex_args.get_regex_args("false");
             quick(message, *force, &regex, reverse, *skip_interactive, config);
         }
-        Commands::Mass { command, regex_args, skip_interactive } => {
+        Commands::Mass {
+            command,
+            regex_args,
+            skip_interactive,
+        } => {
             let (regex, reverse) = regex_args.get_regex_args(".*");
             mass(command, &regex, reverse, *skip_interactive)
         }
@@ -225,7 +232,7 @@ fn activate_profile_prompt(config: &mut Config) {
             config.save_config();
             println!("{} {}", "Activated profile is:".green(), choice.green());
         }
-        Err(_) => println!("{}", "Active profile could not be changed!".red()),
+        Err(_) => println!("{}", "Active profile could not be changed! Make sure there you have a profile configured with grgry profile add.".red()),
     }
 }
 
@@ -234,25 +241,24 @@ fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool) {
     for repo in repos {
         loop {
             println!(
-                "{} {}", "Repo has been found at:".green(),
+                "{} {}",
+                "Repo has been found at:".green(),
                 repo.clone().into_os_string().into_string().unwrap().green()
             );
-            let allow_mass: Result<String, InquireError> =  if !skip_interactive {
+            let allow_mass: Result<String, InquireError> = if !skip_interactive {
                 CustomType::<String>::new(&format!(
-                "Do you want to execute {}? (y)es/(n)o:",
-                command
-            ))
-            .with_validator(&|input: &String| match input.to_lowercase().as_str() {
-                "y" | "n" => Ok(Validation::Valid),
-                _ => Ok(Validation::Invalid(
-                    "Please enter 'y' or 'n'".red().into(),
-                )),
-            })
-            .with_error_message(&"Please type 'y' or 'n'".red())
-            .prompt()
-        } else {
-            Ok("y".to_string())
-        };
+                    "Do you want to execute {}? (y)es/(n)o:",
+                    command
+                ))
+                .with_validator(&|input: &String| match input.to_lowercase().as_str() {
+                    "y" | "n" => Ok(Validation::Valid),
+                    _ => Ok(Validation::Invalid("Please enter 'y' or 'n'".red().into())),
+                })
+                .with_error_message(&"Please type 'y' or 'n'".red())
+                .prompt()
+            } else {
+                Ok("y".to_string())
+            };
             match allow_mass {
                 Ok(choice) => match choice.to_lowercase().as_str() {
                     "y" => {
@@ -261,7 +267,7 @@ fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool) {
                         args.extend(command.split_whitespace());
                         run_cmd_s(Command::new("git").args(args), TEST, false);
                         break;
-                    },
+                    }
                     "n" => break,
                     _ => unreachable!(),
                 },
@@ -271,13 +277,14 @@ fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool) {
     }
 }
 
-//TODO: check profile and switch automatically
-fn quick(message: &str, force: bool, regex: &str, reverse: bool, skip_interactive: bool, config: Config) {
-    // let mass_val = match mass {
-    //     Some(Some(mass_value)) => mass_value.to_string(), // If the user provided a value, use it
-    //     Some(None) => String::from(".*"), // If the user provided the flag but no value, use ".*"
-    //     None => String::from("false"), // If the user didn't provide the flag, use "false" meaning only current folder
-    // };
+fn quick(
+    message: &str,
+    force: bool,
+    regex: &str,
+    reverse: bool,
+    skip_interactive: bool,
+    config: Config,
+) {
     let repos = find_git_repos_parallel(None, regex, reverse);
     for repo in repos {
         let has_changes = run_cmd_o(
@@ -297,16 +304,16 @@ fn quick(message: &str, force: bool, regex: &str, reverse: bool, skip_interactiv
                 );
                 let allow_quicken = if !skip_interactive {
                     CustomType::<String>::new(
-                    "Do you want to quicken this repo? (y)es/(n)o/(m)ore information:",
-                )
-                .with_validator(&|input: &String| match input.to_lowercase().as_str() {
-                    "y" | "n" | "m" => Ok(Validation::Valid),
-                    _ => Ok(Validation::Invalid(
-                        "Please enter 'y', 'n', or 'm'.".red().into(),
-                    )),
-                })
-                .with_error_message(&"Please type 'y', 'n', or 'm'.".red())
-                .prompt()
+                        "Do you want to quicken this repo? (y)es/(n)o/(m)ore information:",
+                    )
+                    .with_validator(&|input: &String| match input.to_lowercase().as_str() {
+                        "y" | "n" | "m" => Ok(Validation::Valid),
+                        _ => Ok(Validation::Invalid(
+                            "Please enter 'y', 'n', or 'm'.".red().into(),
+                        )),
+                    })
+                    .with_error_message(&"Please type 'y', 'n', or 'm'.".red())
+                    .prompt()
                 } else {
                     Ok("y".to_string())
                 };
@@ -518,7 +525,14 @@ fn run_cmd_s(mut command: &mut Command, test: bool, silent: bool) -> bool {
     }
 }
 
-async fn clone(directory: &str, user: bool, branch: String, regex: &str, reverse: bool, config: Config) {
+async fn clone(
+    directory: &str,
+    user: bool,
+    branch: String,
+    regex: &str,
+    reverse: bool,
+    config: Config,
+) {
     let active_profile: Profile = config.active_profile().clone();
     let pat: Option<String> = Some(active_profile.clone().token);
     let provider_type: &str = &active_profile.provider;
