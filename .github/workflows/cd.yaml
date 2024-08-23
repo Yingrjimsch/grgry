@@ -47,7 +47,8 @@ jobs:
         run: |
           ls -la
           CARGO_VERSION=${GITHUB_REF#refs/tags/}
-          sed -i.bak -E "s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${CARGO_VERSION:1}\"/" "Cargo.toml"
+          sed -i.bak -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${CARGO_VERSION:1}\"/" "Cargo.toml"
+          cat Cargo.toml
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
