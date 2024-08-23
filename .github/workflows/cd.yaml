@@ -42,15 +42,6 @@ jobs:
       - name: Get the release version from the tag
         shell: bash
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-      - name: Set release version into Cargo.toml
-        shell: bash
-        run: |
-          ls -la
-          CARGO_VERSION=${GITHUB_REF#refs/tags/}
-          sed -i.bak -E '/name = "grgry"/{n;s/^version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$CARGO_VERSION"'"/}' "Cargo.toml"
-          sed -i.bak -E '/name = "grgry"/{n;s/^version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$CARGO_VERSION"'"/}' "Cargo.lock"
-          cat Cargo.toml
-          cat Cargo.lock
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
