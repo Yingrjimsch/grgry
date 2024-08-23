@@ -1,9 +1,9 @@
 use colored::Colorize;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
+use std::fs::{self, File};
 use std::path::Path;
 use std::{collections::HashMap, path::PathBuf};
-use std::fs::{self, File};
 use toml_edit::{value, DocumentMut};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

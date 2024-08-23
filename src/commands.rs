@@ -46,7 +46,12 @@ pub enum Commands {
         #[clap(flatten)]
         regex_args: Regex,
 
-        #[arg(short, long, default_value_t = false, help = "Don't ask for permission to execute command per repository")]
+        #[arg(
+            short,
+            long,
+            default_value_t = false,
+            help = "Don't ask for permission to execute command per repository"
+        )]
         skip_interactive: bool,
     },
     Mass {
@@ -60,7 +65,12 @@ pub enum Commands {
         #[clap(flatten)]
         regex_args: Regex,
 
-        #[arg(short, long, default_value_t = false, help = "Don't ask for permission to execute command per repository")]
+        #[arg(
+            short,
+            long,
+            default_value_t = false,
+            help = "Don't ask for permission to execute command per repository"
+        )]
         skip_interactive: bool,
     },
     Profile {
@@ -84,8 +94,10 @@ pub struct Regex {
         help = "Use regex to execute command en mass. Without option it searches for all repos.")]
     regex: Option<Option<String>>,
     /// Argument2.
-    #[clap(long,
-        help = "Use regex to execute command en mass excluding matching repos.")]
+    #[clap(
+        long,
+        help = "Use regex to execute command en mass excluding matching repos."
+    )]
     rev_regex: Option<String>,
 }
 
