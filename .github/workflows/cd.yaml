@@ -46,8 +46,8 @@ jobs:
         shell: bash
         run: |
           ls -la
-          
-          sed -i.bak -E "s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${{ env.VERSION:1 }}\"/" "Cargo.toml"
+          CARGO_VERSION=$${GITHUB_REF#refs/tags/}
+          sed -i.bak -E "s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${CARGO_VERSION:1}\"/" "Cargo.toml"
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
