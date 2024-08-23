@@ -47,6 +47,7 @@ jobs:
         run: |
           ls -la
           CARGO_VERSION=${GITHUB_REF#refs/tags/v}
+          echo $CARGO_VERSION
           sed -i.bak -E '/name = "grgry"/{n;s/^version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$CARGO_VERSION"'"/}' "Cargo.toml"
           sed -i.bak -E '/name = "grgry"/{n;s/^version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$CARGO_VERSION"'"/}' "Cargo.lock"
           cat Cargo.toml
