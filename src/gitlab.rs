@@ -1,7 +1,6 @@
 use crate::{
     config::Profile,
     git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
-    github::GithubRepo,
 };
 
 use reqwest::Response;
