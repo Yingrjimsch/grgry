@@ -108,3 +108,6 @@ Contributions, improvements, and feature requests are welcome! Keep in mind that
 - [ ] Change the command about and long about to something clearer
 - [ ] Create submodules to structure the code / refactoring
 - [ ] `grgry show` with parameter `--all` showing the current activated profile or all profiles
+- [ ] add option to `pull --rebase` in `grgry quick`
+- [ ] add an option to `--ammend` commits
+- [ ] open issue with walkdir to stop at .git folder instead of traversing into the folder (speedup)
