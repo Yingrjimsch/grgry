@@ -1,10 +1,9 @@
 mod commands;
 mod config;
-// mod git_providers;
-// mod github;
-// mod gitlab;
+mod git_providers;
+mod github;
+mod gitlab;
 mod helper;
-mod git;
 
 use clap::Parser;
 use colored::Colorize;
