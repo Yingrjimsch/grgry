@@ -107,7 +107,7 @@ Contributions, improvements, and feature requests are welcome! Keep in mind that
 - [ ] Release pipeline for cargo
 - [ ] Change the command about and long about to something clearer
 - [ ] Create submodules to structure the code / refactoring
-- [ ] `grgry show` with parameter `--all` showing the current activated profile or all profiles
+- [x] <del>`grgry show` with parameter `--all` showing the current activated profile or all profiles</del>
 - [ ] add option to `pull --rebase` in `grgry quick`
 - [ ] add an option to `--ammend` commits
-- [ ] open issue with walkdir to stop at .git folder instead of traversing into the folder (speedup)
+- [x] <del>open issue with walkdir to stop at .git folder instead of traversing into the folder (speedup)</del>
