@@ -27,11 +27,11 @@ pub struct Config {
 impl Config {
     // Creates a new Config by loading the profiles from the given file
     pub fn new() -> Self {
-        let config_file_path = Self::get_default_config_path();
+        let config_file_path: PathBuf = Self::get_default_config_path();
         if !config_file_path.exists() {
             Self::create_empty_config_file(&config_file_path);
         }
-        let profiles = Self::load_profiles(&config_file_path);
+        let profiles: HashMap<String, Profile> = Self::load_profiles(&config_file_path);
         Config {
             profiles,
             config_file_path,
@@ -39,7 +39,7 @@ impl Config {
     }
 
     fn get_default_config_path() -> PathBuf {
-        let mut config_path = home_dir().expect("Failed to get home directory");
+        let mut config_path: PathBuf = home_dir().expect("Failed to get home directory");
         config_path.push(".config");
         config_path.push("grgry.toml");
         config_path
@@ -57,15 +57,15 @@ impl Config {
     }
 
     fn load_profiles<P: AsRef<Path>>(config_file_path: P) -> HashMap<String, Profile> {
-        let toml_content = fs::read_to_string(config_file_path).expect("Failed to read file");
-        let doc = toml_content
+        let toml_content: String = fs::read_to_string(config_file_path).expect("Failed to read file");
+        let doc: DocumentMut = toml_content
             .parse::<DocumentMut>()
             .expect("Failed to parse TOML");
 
         //TODO on load check if not empty (VALID)
-        let mut profiles = HashMap::new();
+        let mut profiles: HashMap<String, Profile> = HashMap::new();
         for (key, value) in doc.iter() {
-            let profile = Profile {
+            let profile: Profile = Profile {
                 active: value["active"].as_bool().unwrap_or(false),
                 pulloption: value["pulloption"].as_str().unwrap_or("").to_string(),
                 username: value["username"].as_str().unwrap_or("").to_string(),
@@ -96,9 +96,9 @@ impl Config {
 
     // Saves the current state of profiles back to the config file
     pub fn save_config(&self) {
-        let mut toml_content =
+        let mut toml_content: String =
             fs::read_to_string(&self.config_file_path).expect("Failed to read file");
-        let mut doc = toml_content
+        let mut doc: DocumentMut = toml_content
             .parse::<DocumentMut>()
             .expect("Failed to parse TOML");
 
@@ -140,7 +140,7 @@ impl Config {
     }
 
     pub fn active_profile(&self) -> &Profile {
-        match self.profiles.values().find(|profile| profile.active) {
+        match self.profiles.values().find(|profile: &&Profile| profile.active) {
             Some(profile) => profile,
             None => {
                 eprintln!("{}", "One profile needs to be activated. For activating a profile use grgry profile activate!".red());

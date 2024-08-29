@@ -1,12 +1,15 @@
+pub mod github;
+pub mod gitlab;
 use std::process;
 
 use colored::Colorize;
+use gitlab::GitlabRepo;
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Client, Response,
 };
 use tokio::task;
-use crate::{config::Profile, github::GithubRepo, gitlab::GitlabRepo};
+use crate::{config::Profile};
 
 // Define the trait in a common file (e.g., `git_provider.rs`)
 pub trait GitProvider {

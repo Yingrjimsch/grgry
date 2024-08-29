@@ -1,14 +1,12 @@
-use std::default;
-
 use clap::Subcommand;
 #[derive(Subcommand)]
 pub enum Commands {
-    #[command(about = "Clone a repository into the specified directory")]
+    #[command(about = "Clone a repository into the specified directory.")]
     Clone {
         #[arg(
             value_name = "DIRECTORY",
             required = true,
-            help = "The group / org / user / repo to clone"
+            help = "The group / org / user / repo to clone."
         )]
         directory: String,
 
@@ -16,7 +14,7 @@ pub enum Commands {
             short,
             long,
             default_value_t = false,
-            help = "Specify if the directory is a user directory or not (default false)"
+            help = "Specify if the directory is a user directory or not (default false)."
         )]
         user: bool,
 
@@ -24,7 +22,7 @@ pub enum Commands {
             short,
             long,
             default_value = "",
-            help = "Clone specific branch (default no specific branch)"
+            help = "Clone specific branch (default no specific branch)."
         )]
         branch: String,
 
@@ -50,7 +48,7 @@ pub enum Commands {
             short,
             long,
             default_value_t = false,
-            help = "Don't ask for permission to execute command per repository"
+            help = "Don't ask for permission to execute command per repository."
         )]
         skip_interactive: bool,
     },
@@ -59,7 +57,7 @@ pub enum Commands {
         #[arg(
             value_name = "COMMAND",
             required = true,
-            help = "This is the command to execute as if it was a git command without git prefix"
+            help = "This is the command to execute as if it was a git command without git prefix."
         )]
         command: String,
 
@@ -70,7 +68,7 @@ pub enum Commands {
             short,
             long,
             default_value_t = false,
-            help = "Don't ask for permission to execute command per repository"
+            help = "Don't ask for permission to execute command per repository."
         )]
         skip_interactive: bool,
     },
@@ -79,6 +77,7 @@ pub enum Commands {
         #[clap(subcommand)]
         sub: ProfileCommands,
     },
+    Test
 }
 
 #[derive(Subcommand)]
@@ -89,16 +88,19 @@ pub enum ProfileCommands {
     Add,
     #[command(about = "Remove a unused or wrong profile.")]
     Delete,
+    #[command(about = "Show the current activated profile.")]
+    Show {
+        #[arg(short, long, default_value_t = false, help = "Show all profiles.")]
+        all: bool
+    },
 }
 
 #[derive(Debug, clap::Args)]
 #[group(multiple = false)]
 pub struct Regex {
-    /// Argument1.
     #[clap(long, value_parser, num_args(0..=1),
         help = "Use regex to execute command en mass. Without option it searches for all repos.")]
     regex: Option<Option<String>>,
-    /// Argument2.
     #[clap(
         long,
         help = "Use regex to execute command en mass excluding matching repos."

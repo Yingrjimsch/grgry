@@ -1,33 +1,22 @@
 mod commands;
 mod config;
-mod git_providers;
-mod github;
-mod gitlab;
+// mod git_providers;
+// mod github;
+// mod gitlab;
+mod helper;
+mod git;
 
 use clap::Parser;
 use colored::Colorize;
 use commands::Commands;
 use config::{Config, Profile};
-use git_providers::GitProvider;
-use git_providers::Repo;
+use git_providers::{GitProvider, Repo};
 use github::Github;
 use gitlab::Gitlab;
-use inquire::validator::Validation;
-use inquire::Confirm;
-use inquire::{error::InquireError, required, CustomType, Select, Text};
-use rayon::prelude::*;
-use rayon::str;
+use inquire::{validator::Validation, error::InquireError, required, CustomType, Select, Text, Confirm};
+use rayon::{prelude::*, str};
 use regex::Regex;
-use std::collections::HashMap;
-use std::path;
-use std::path::{Path, PathBuf};
-use std::process;
-use std::process::Command;
-use std::process::Stdio;
-use std::sync::mpsc;
-use std::sync::Arc;
-use std::thread;
-use tokio::time::error::Elapsed;
+use std::{collections::HashMap, path::{Path, PathBuf}, process::{Command, Stdio}, sync::{mpsc, Arc}, thread, process};
 use walkdir::WalkDir;
 
 const TEST: bool = false;
@@ -43,8 +32,8 @@ struct Cli {
 
 #[tokio::main]
 async fn main() {
-    let mut config = Config::new();
-    let cli = Cli::parse();
+    let mut config: Config = Config::new();
+    let cli: Cli = Cli::parse();
 
     match &cli.command {
         Commands::Clone {
@@ -85,13 +74,26 @@ async fn main() {
             commands::ProfileCommands::Activate => activate_profile_prompt(&mut config),
             commands::ProfileCommands::Add => add_profile_prompt(&mut config),
             commands::ProfileCommands::Delete => delete_profile_prompt(&mut config),
+            commands::ProfileCommands::Show { all }=> show_profile(*all, config),
         },
+        Commands::Test { } => {
+            let reops = find_git_repos_parallel(None, ".*", false);
+            println!("{:?}", reops);
+        }
+    }
+}
+
+fn show_profile(all: bool, config: Config) {
+    if all {
+        println!("{}", serde_json::to_string_pretty(&config).unwrap());
+    } else {
+        println!("{}", serde_json::to_string_pretty(&config.active_profile()).unwrap());
     }
 }
 
 fn delete_profile_prompt(config: &mut Config) {
-    let profiles_cloned = do_clone(&config.profiles);
-    let profile_keys: Vec<&str> = profiles_cloned.keys().map(|key| key.as_str()).collect();
+    let profiles_cloned: HashMap<String, Profile> = do_clone(&config.profiles);
+    let profile_keys: Vec<&str> = profiles_cloned.keys().map(|key: &String| key.as_str()).collect();
     let profile_to_delete_key: Result<&str, InquireError> =
         Select::new("Which profile do you want to delete?", profile_keys).prompt();
 
@@ -106,7 +108,7 @@ fn delete_profile_prompt(config: &mut Config) {
 }
 
 fn add_profile_prompt(config: &mut Config) {
-    let profile_name = Text::new("profile name:")
+    let profile_name: Result<String, InquireError> = Text::new("profile name:")
         .with_validator(required!("This field is required"))
         //TODO: would be nice to validate if the profile already exists but does not work due to my rust incapabilities
         // .with_validator(
@@ -117,16 +119,16 @@ fn add_profile_prompt(config: &mut Config) {
         //         Ok(Validation::Valid)
         //     }
         // })
-        .with_help_message("Optional notes")
+        .with_help_message("The name of your profile (e.g. Github Profile)")
         .prompt();
     match profile_name {
         Ok(_) => {}
         Err(_) => process::exit(1),
     };
 
-    let target_base_path = Text::new("target base path:")
+    let target_base_path: Result<String, InquireError> = Text::new("target base path:")
         .with_validator(required!("This field is required"))
-        .with_help_message("Optional notes")
+        .with_help_message("The absolute path where the repos should be cloned to (e.g. /home/you/repos)")
         .with_default("")
         .prompt();
     match target_base_path {
@@ -134,8 +136,8 @@ fn add_profile_prompt(config: &mut Config) {
         Err(_) => process::exit(1),
     };
 
-    let user_name = Text::new("user name:")
-        .with_help_message("Optional notes")
+    let user_name: Result<String, InquireError> = Text::new("user name:")
+        .with_help_message("The name shown in the commit")
         .with_default("")
         .prompt();
     match user_name {
@@ -143,8 +145,8 @@ fn add_profile_prompt(config: &mut Config) {
         Err(_) => process::exit(1),
     };
 
-    let user_email = Text::new("user email:")
-        .with_help_message("Optional notes")
+    let user_email: Result<String, InquireError> = Text::new("user email:")
+        .with_help_message("The email shown in the commit")
         .with_default("")
         .prompt();
     match user_email {
@@ -167,17 +169,17 @@ fn add_profile_prompt(config: &mut Config) {
         Err(_) => process::exit(1),
     };
 
-    let base_address = Text::new("base address:")
+    let base_address: Result<String, InquireError> = Text::new("base address:")
         .with_validator(required!("This field is required"))
-        .with_help_message("Optional notes")
+        .with_help_message("The base address of your provider (e.g. https://github.com)")
         .prompt();
     match base_address {
         Ok(_) => {}
         Err(_) => process::exit(1),
     };
 
-    let token = Text::new("token:")
-        .with_help_message("Optional notes")
+    let token: Result<String, InquireError> = Text::new("token:")
+        .with_help_message("The token to access the provider, if empty only public repos can be cloned")
         .with_default("")
         .prompt();
     match token {
@@ -185,7 +187,7 @@ fn add_profile_prompt(config: &mut Config) {
         Err(_) => process::exit(1),
     };
 
-    let activate = Confirm::new("Do you want to activate the profile?")
+    let activate: Result<bool, InquireError> = Confirm::new("Do you want to activate the profile?")
         .with_default(false)
         .prompt();
     match activate {
@@ -193,7 +195,7 @@ fn add_profile_prompt(config: &mut Config) {
         Err(_) => process::exit(1),
     };
 
-    let profile_name = profile_name.unwrap();
+    let profile_name: String = profile_name.unwrap();
     config.profiles.insert(
         profile_name.clone(),
         Profile {
@@ -222,8 +224,8 @@ fn do_clone<K: Clone, V: Clone>(data: &HashMap<K, V>) -> HashMap<K, V> {
 }
 
 fn activate_profile_prompt(config: &mut Config) {
-    let profiles_cloned = do_clone(&config.profiles);
-    let profile_keys: Vec<&str> = profiles_cloned.keys().map(|key| key.as_str()).collect();
+    let profiles_cloned: HashMap<String, Profile> = do_clone(&config.profiles);
+    let profile_keys: Vec<&str> = profiles_cloned.keys().map(|key: &String| key.as_str()).collect();
 
     let profile_to_activate_key: Result<&str, InquireError> =
         Select::new("Choose profile to activate:", profile_keys).prompt();
@@ -238,13 +240,13 @@ fn activate_profile_prompt(config: &mut Config) {
 }
 
 fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool) {
-    let repos = find_git_repos_parallel(None, &regex, reverse);
+    let repos: Vec<PathBuf> = find_git_repos_parallel(None, &regex, reverse);
     for repo in repos {
         loop {
             println!(
                 "{} {}",
-                "Repo has been found at:".green(),
-                repo.clone().into_os_string().into_string().unwrap().green()
+                "Repo has been found at:",
+                repo.clone().into_os_string().into_string().unwrap()
             );
             let allow_mass: Result<String, InquireError> = if !skip_interactive {
                 CustomType::<String>::new(&format!(
@@ -263,8 +265,8 @@ fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool) {
             match allow_mass {
                 Ok(choice) => match choice.to_lowercase().as_str() {
                     "y" => {
-                        let repo_path = repo.clone().into_os_string().into_string().unwrap();
-                        let mut args = vec!["-C", &repo_path];
+                        let repo_path: String = repo.clone().into_os_string().into_string().unwrap();
+                        let mut args: Vec<&str> = vec!["-C", &repo_path];
                         args.extend(command.split_whitespace());
                         run_cmd_s(Command::new("git").args(args), TEST, false);
                         break;
@@ -286,7 +288,7 @@ fn quick(
     skip_interactive: bool,
     config: Config,
 ) {
-    let repos = find_git_repos_parallel(None, regex, reverse);
+    let repos: Vec<PathBuf> = find_git_repos_parallel(None, regex, reverse);
     for repo in repos {
         let has_changes = run_cmd_o(
             Command::new("git").args(&[
@@ -303,7 +305,7 @@ fn quick(
                     "There are changes in the repository {}",
                     repo.clone().into_os_string().into_string().unwrap()
                 );
-                let allow_quicken = if !skip_interactive {
+                let allow_quicken: Result<String, InquireError> = if !skip_interactive {
                     CustomType::<String>::new(
                         "Do you want to quicken this repo? (y)es/(n)o/(m)ore information:",
                     )
@@ -318,7 +320,7 @@ fn quick(
                 } else {
                     Ok("y".to_string())
                 };
-                let remote_origin_url = run_cmd_o(
+                let remote_origin_url: String = run_cmd_o(
                     Command::new("git").args(&[
                         "-C",
                         &repo.clone().into_os_string().into_string().unwrap(),
@@ -331,8 +333,8 @@ fn quick(
                 match allow_quicken {
                     Ok(choice) => match choice.to_lowercase().as_str() {
                         "y" => {
-                            let profile_keys = config.find_profiles_by_provider(&remote_origin_url);
-                            let profile = if profile_keys.len() == 1 {
+                            let profile_keys: Vec<&str> = config.find_profiles_by_provider(&remote_origin_url);
+                            let profile: &Profile = if profile_keys.len() == 1 {
                                 config
                                     .profiles
                                     .get(&profile_keys.first().unwrap().to_string())
@@ -341,7 +343,7 @@ fn quick(
                                 let selected_profile_key: Result<&str, InquireError> =
                                     Select::new("Choose profile to quicken?", profile_keys)
                                         .prompt();
-                                let chosen_profile = match selected_profile_key {
+                                let chosen_profile: &Profile = match selected_profile_key {
                                     Ok(choice) => config.profiles.get(choice).unwrap(),
                                     Err(_) => config.active_profile(),
                                 };
@@ -440,10 +442,10 @@ fn quick(
                                 TEST,
                                 false,
                             );
-                            println!("{0: <10}: {1}", "URL", &remote_origin_url);
+                            println!("{0: <10}: {1}", "URL".green(), &remote_origin_url.green());
                             println!(
                                 "{0: <10}: {1}",
-                                "Branch",
+                                "Branch".green(),
                                 &run_cmd_o(
                                     Command::new("git").args(&[
                                         "-C",
@@ -452,7 +454,7 @@ fn quick(
                                         "--show-current"
                                     ]),
                                     TEST
-                                )
+                                ).green()
                             );
                         }
                         _ => unreachable!(),
@@ -466,19 +468,19 @@ fn quick(
 }
 
 fn command_to_string(command: &Command) -> String {
-    let cmd_str = format!("{:?}", command);
+    let cmd_str: String = format!("{:?}", command);
     cmd_str
 }
 
 fn run_cmd_o(command: &mut Command, test: bool) -> String {
     if test {
-        let cmd_str = command_to_string(command);
+        let cmd_str: String = command_to_string(command);
         println!("Executing: {}", cmd_str);
         return String::from("");
     } else {
-        let output = command.output().expect("Failed to execute command!");
+        let output: process::Output = command.output().expect("Failed to execute command!");
         if !output.status.success() {
-            eprintln!("Error: {}", String::from_utf8_lossy(&output.stderr));
+            eprintln!("{} {}", "Error:".red(), String::from_utf8_lossy(&output.stderr).red());
             std::process::exit(1);
         }
 
@@ -488,11 +490,11 @@ fn run_cmd_o(command: &mut Command, test: bool) -> String {
 
 fn run_cmd_o_soft(command: &mut Command, test: bool) -> (String, bool) {
     if test {
-        let cmd_str = command_to_string(command);
+        let cmd_str: String = command_to_string(command);
         println!("Executing: {}", cmd_str);
         return (String::from(""), true);
     } else {
-        let output = command.output().expect("Failed to execute command!");
+        let output: process::Output = command.output().expect("Failed to execute command!");
         if !output.status.success() {
             return (
                 String::from_utf8_lossy(&output.stdout).trim().to_string(),
@@ -508,7 +510,7 @@ fn run_cmd_o_soft(command: &mut Command, test: bool) -> (String, bool) {
 
 fn run_cmd_s(mut command: &mut Command, test: bool, silent: bool) -> bool {
     if test {
-        let cmd_str = command_to_string(command);
+        let cmd_str: String = command_to_string(command);
         println!("Executing: {}", cmd_str);
         return true;
     } else {
@@ -517,9 +519,9 @@ fn run_cmd_s(mut command: &mut Command, test: bool, silent: bool) -> bool {
         } else {
             command
         };
-        let status = command.status().expect("Failed to execute command!");
+        let status: process::ExitStatus = command.status().expect("Failed to execute command!");
         if !status.success() {
-            eprintln!("Error executing command on {}", command_to_string(command));
+            eprintln!("{} {}", "Error executing command on".red(), command_to_string(command).red());
             std::process::exit(1);
         }
         return status.success();
@@ -546,11 +548,11 @@ async fn clone(
     let all_repos: Vec<Box<dyn Repo>> =
         provider.get_repos(&pat, directory, user, active_profile.clone());
 
-    let num_threads = std::thread::available_parallelism().unwrap().into();
-    let re = Regex::new(regex).expect("Invalid regex pattern");
+    let num_threads: usize = std::thread::available_parallelism().unwrap().into();
+    let re: Regex = Regex::new(regex).expect("Invalid regex pattern");
     let repos_to_clone: Vec<Box<dyn Repo>> = all_repos
         .into_iter()
-        .filter(|repo| (re.is_match(&repo.http_url()) || re.is_match(&repo.ssh_url())) ^ reverse)
+        .filter(|repo: &Box<dyn Repo>| (re.is_match(&repo.http_url()) || re.is_match(&repo.ssh_url())) ^ reverse)
         .collect();
     run_in_threads(
         num_threads,
@@ -564,7 +566,7 @@ async fn clone(
                 &repo.http_url()
             };
             if Path::new(&destination_path).exists() {
-                let mut current_branch = branch.clone();
+                let mut current_branch: String = branch.clone();
                 if branch == "" {
                     let (symbolic_ref, success) = run_cmd_o_soft(
                         Command::new("git").args(&[
@@ -581,7 +583,7 @@ async fn clone(
                     }
                     current_branch = symbolic_ref.strip_prefix("origin/").unwrap().to_string();
                 }
-                let branch_exists = run_cmd_o(
+                let branch_exists: String = run_cmd_o(
                     Command::new("git").args(&[
                         "-C",
                         &destination_path,
@@ -609,12 +611,12 @@ async fn clone(
                         TEST,
                         true,
                     );
-                    println!("Repo: {} successfully pulled!", clone_url);
+                    println!("{} {} {}", "Repo:".green(), clone_url.green(), "successfully pulled!".green() );
                 }
                 return;
             }
 
-            let status = run_cmd_s(
+            let status: bool = run_cmd_s(
                 Command::new("git")
                     .args(&create_pull_request_args(
                         &branch,
@@ -628,11 +630,11 @@ async fn clone(
                 true,
             );
             if status {
-                println!("Repo: {} successfully cloned!", clone_url.green());
+                println!("{} {} {}", "Repo:".green(), clone_url.green(), "successfully cloned!".green());
             }
         },
     );
-    println!("Finished cloning repositories");
+    println!("{}", "Finished cloning repositories".green());
 }
 
 fn create_pull_request_args(
@@ -641,7 +643,7 @@ fn create_pull_request_args(
     target_basepath: &str,
     directory: &str,
 ) -> Vec<String> {
-    let mut args = vec![
+    let mut args: Vec<String> = vec![
         "clone".to_string(),
         clone_url.to_string(),
         format!("{}/{}", target_basepath, directory),
@@ -663,10 +665,16 @@ fn find_git_repos_parallel(root: Option<&Path>, pattern: &str, reverse: bool) ->
 
     WalkDir::new(root)
         .into_iter()
-        .par_bridge() // Convert iterator to a parallel iterator
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.file_type().is_dir())
-        .filter(|entry| {
+        .filter_entry(|entry| {
+            let path = entry.path();
+            // Continue descending only if the directory does not contain a .git folder
+            !path.parent().map(|p| p.join(".git").is_dir()).unwrap_or(false)
+        }) 
+        .par_bridge()
+        // Convert iterator to a parallel iterator
+        .filter_map(|entry: Result<walkdir::DirEntry, walkdir::Error>| entry.ok())
+        .filter(|entry: &walkdir::DirEntry| entry.file_type().is_dir())
+        .filter(|entry: &walkdir::DirEntry| {
             let path = entry.path();
             // Check if the directory contains a .git folder
             path.join(".git").is_dir()
@@ -676,12 +684,12 @@ fn find_git_repos_parallel(root: Option<&Path>, pattern: &str, reverse: bool) ->
             // Check if the path matches the regex pattern
             regex.is_match(&path_str) ^ reverse
         })
-        .map(|entry| entry.into_path())
+        .map(|entry: walkdir::DirEntry| entry.into_path())
         .collect()
 }
 
 fn create_push_request_args(repo_path: &str, branch: &str, set_upstream: bool) -> Vec<String> {
-    let mut args = vec![
+    let mut args: Vec<String> = vec![
         "-C".to_string(),
         repo_path.to_string(),
         "push".to_string(),
