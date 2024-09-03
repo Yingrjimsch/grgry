@@ -111,3 +111,6 @@ Contributions, improvements, and feature requests are welcome! Keep in mind that
 - [ ] add option to `pull --rebase` in `grgry quick`
 - [ ] add an option to `--ammend` commits
 - [x] <del>open issue with walkdir to stop at .git folder instead of traversing into the folder (speedup)</del>
+- [ ] try to work with https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/ to speeden up the git clone
+- [ ] quick default en mass instead of default singular
+- [ ] try https://statics.teams.cdn.office.net/evergreen-assets/safelinks/1/atp-safelinks.html for a `grgry update` functionallity
