@@ -98,9 +98,9 @@ pub enum ProfileCommands {
 #[derive(Debug, clap::Args)]
 #[group(multiple = false)]
 pub struct Regex {
-    #[clap(long, value_parser, num_args(0..=1),
+    #[clap(long,
         help = "Use regex to execute command en mass. Without option it searches for all repos.")]
-    regex: Option<Option<String>>,
+    regex: Option<String>,
     #[clap(
         long,
         help = "Use regex to execute command en mass excluding matching repos."
@@ -114,10 +114,7 @@ impl Regex {
         if let Some(rev_regex) = &self.rev_regex {
             (rev_regex.clone(), true)
         } else if let Some(regex) = &self.regex {
-            match regex {
-                Some(pattern) => (pattern.to_string(), false), // If the user provided a value, use it
-                None => (String::from(".*"), false), // If the user provided the flag but no value, use ".*"
-            }
+            (regex.clone(), false);
         } else {
             (default.to_string(), false)
         }

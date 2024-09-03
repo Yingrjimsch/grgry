@@ -6,7 +6,7 @@ use reqwest::{
     Client, Response,
 };
 use tokio::task;
-use crate::{config::Profile, github::GithubRepo, gitlab::GitlabRepo};
+use crate::{profile::config::Profile, git_api::github::GithubRepo, git_api::gitlab::GitlabRepo};
 
 // Define the trait in a common file (e.g., `git_provider.rs`)
 pub trait GitProvider {

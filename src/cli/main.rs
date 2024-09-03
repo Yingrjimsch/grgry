@@ -1,22 +1,15 @@
-mod commands;
-mod config;
-mod git_providers;
-mod github;
-mod gitlab;
-mod helper;
-
 use clap::Parser;
 use colored::Colorize;
 use commands::Commands;
-use config::{Config, Profile};
-use git_providers::{GitProvider, Repo};
-use github::Github;
-use gitlab::Gitlab;
+// use crate::profile::config::{Config, Profile};
+// use crate::git_api::{git_providers::{GitProvider, Repo}, github::Github, gitlab::Gitlab};
 use inquire::{validator::Validation, error::InquireError, required, CustomType, Select, Text, Confirm};
 use rayon::{prelude::*, str};
 use regex::Regex;
 use std::{collections::HashMap, path::{Path, PathBuf}, process::{Command, Stdio}, sync::{mpsc, Arc}, thread, process};
 use walkdir::WalkDir;
+
+use super::commands;
 
 const TEST: bool = false;
 
@@ -41,7 +34,7 @@ async fn main() {
             branch,
             regex_args,
         } => {
-            let (regex, reverse) = regex_args.get_regex_args(".*");
+            let (regex, reverse) = regex_args.get_regex_args(".*"); //TODO: default as global variable
             clone(
                 directory,
                 *user,
@@ -58,7 +51,7 @@ async fn main() {
             regex_args,
             skip_interactive,
         } => {
-            let (regex, reverse) = regex_args.get_regex_args("false");
+            let (regex, reverse) = regex_args.get_regex_args(".*");
             quick(message, *force, &regex, reverse, *skip_interactive, config);
         }
         Commands::Mass {
@@ -348,6 +341,17 @@ fn quick(
                                 };
                                 chosen_profile
                             };
+                            //should i rebase here? is this the right choice?
+                            run_cmd_s(
+                                Command::new("git").args(&[
+                                    "-C",
+                                    &repo.clone().into_os_string().into_string().unwrap(),
+                                    "pull",
+                                    "--rebase",
+                                ]),
+                                TEST,
+                                true,
+                            );
                             run_cmd_s(
                                 Command::new("git").args(&[
                                     "-C",
@@ -458,7 +462,7 @@ fn quick(
                         }
                         _ => unreachable!(),
                     },
-                    Err(_) => break,
+                    Err(_) => return, //HERE return so i can escape from quicken command
                 };
             },
             false => {}
@@ -657,9 +661,6 @@ fn create_pull_request_args(
 
 fn find_git_repos_parallel(root: Option<&Path>, pattern: &str, reverse: bool) -> Vec<PathBuf> {
     let root: &Path = root.unwrap_or(Path::new("."));
-    if pattern == "false" {
-        return vec![root.to_path_buf()];
-    }
     let regex: Regex = Regex::new(pattern).expect("Invalid regex pattern");
 
     WalkDir::new(root)
@@ -668,7 +669,7 @@ fn find_git_repos_parallel(root: Option<&Path>, pattern: &str, reverse: bool) ->
             let path = entry.path();
             // Continue descending only if the directory does not contain a .git folder
             !path.parent().map(|p| p.join(".git").is_dir()).unwrap_or(false)
-        }) 
+        })
         .par_bridge()
         // Convert iterator to a parallel iterator
         .filter_map(|entry: Result<walkdir::DirEntry, walkdir::Error>| entry.ok())
