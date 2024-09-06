@@ -1,6 +1,6 @@
 use crate::{
-    profile::config::Profile,
     git_api::git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
+    config::config::Profile,
 };
 
 use reqwest::Response;
@@ -32,11 +32,7 @@ impl Repo for GitlabRepo {
 pub struct Gitlab;
 impl GitProvider for Gitlab {
     fn get_repos(
-        &self,
-        pat: &Option<String>,
-        collection_name: &str,
-        user: bool,
-        active_profile: Profile,
+        &self, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile,
     ) -> Vec<Box<dyn Repo>> {
         block_in_place(|| {
             let future = async {
@@ -63,14 +59,7 @@ impl GitProvider for Gitlab {
                     ("simple".to_string(), "true".to_string()),
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
-                get_repos_paralell(
-                    pages,
-                    &endpoint,
-                    parameters,
-                    headers,
-                    &active_profile.provider,
-                )
-                .await
+                get_repos_paralell(pages, &endpoint, parameters, headers, &active_profile.provider).await
             };
 
             // Block on the async task, so it runs to completion and returns the result.
@@ -88,8 +77,7 @@ impl GitProvider for Gitlab {
                     ("page".to_string(), "1".to_string()),
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
-                let resp_total_repos: Response =
-                    call_api(endpoint, parameters.as_deref(), headers.as_deref()).await;
+                let resp_total_repos: Response = call_api(endpoint, parameters.as_deref(), headers.as_deref()).await;
                 return resp_total_repos
                     .headers()
                     .get("x-total-pages")

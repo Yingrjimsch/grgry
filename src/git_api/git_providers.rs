@@ -1,22 +1,20 @@
 use std::process;
 
+use crate::{git_api::github::GithubRepo, git_api::gitlab::GitlabRepo, config::config::Profile};
 use colored::Colorize;
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Client, Response,
 };
 use tokio::task;
-use crate::{profile::config::Profile, git_api::github::GithubRepo, git_api::gitlab::GitlabRepo};
+
+use super::{github::Github, gitlab::Gitlab};
 
 // Define the trait in a common file (e.g., `git_provider.rs`)
 pub trait GitProvider {
     fn get_page_number(&self, endpoint: &str, headers: Option<Vec<(String, String)>>) -> i32;
     fn get_repos(
-        &self,
-        pat: &Option<String>,
-        collection_name: &str,
-        user: bool,
-        active_profile: Profile,
+        &self, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile,
     ) -> Vec<Box<dyn Repo>>;
 }
 
@@ -45,12 +43,8 @@ pub async fn get_repos_paralell(
         }
 
         tasks.push(task::spawn(async move {
-            let response: Response = call_api(
-                &endpoint_clone,
-                parameters_clone.as_deref(),
-                headers_clone.as_deref(),
-            )
-            .await;
+            let response: Response =
+                call_api(&endpoint_clone, parameters_clone.as_deref(), headers_clone.as_deref()).await;
             let repos: Vec<Box<dyn Repo>> = match provider.as_str() {
                 "gitlab" => response
                     .json::<Vec<GitlabRepo>>()
@@ -80,9 +74,7 @@ pub async fn get_repos_paralell(
 }
 
 pub async fn call_api(
-    endpoint: &str,
-    parameters: Option<&[(String, String)]>,
-    headers: Option<&[(String, String)]>,
+    endpoint: &str, parameters: Option<&[(String, String)]>, headers: Option<&[(String, String)]>,
 ) -> Response {
     let client: Client = Client::builder().build().expect("error while build client");
     let mut request: reqwest::RequestBuilder = client.get(endpoint);
@@ -110,4 +102,15 @@ pub async fn call_api(
     };
 
     return response;
+}
+
+pub fn get_provider(provider_type: &str) -> Box<dyn GitProvider> {
+    return match provider_type {
+        "gitlab" => Box::new(Gitlab),
+        "github" => Box::new(Github),
+        _ => {
+            println!("{} {} {}", "The provider type".red(), provider_type.red(), "is not supported or does not exist, for further https://github.com/Yingrjimsch/grgry/issues/new?assignees=&labels=question&projects=&template=FEATURE-REQUEST.yml");
+            unreachable!()
+        },
+    }
 }
