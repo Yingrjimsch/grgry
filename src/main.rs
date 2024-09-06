@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use grgry::{cli::{clone, commands::{Commands, ProfileCommands}, mass, profile::{activate_profile_prompt, add_profile_prompt, delete_profile_prompt, show_profile}, quick}, config::config::Config};
+use reqwest::Client;
 
 #[derive(Parser)]
 #[command(name = "grgry")]
@@ -14,6 +17,10 @@ struct Cli {
 async fn main() {
     let mut config: Config = Config::new();
     let cli: Cli = Cli::parse();
+    let client = Arc::new(Client::builder()
+        .http2_prior_knowledge()
+        .build()
+        .expect("Failed to build reqwest client"));
 
     match &cli.command {
         Commands::Clone {
@@ -32,6 +39,7 @@ async fn main() {
                 reverse,
                 *dry_run,
                 config,
+                client,
             )
             .await;
         }

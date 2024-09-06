@@ -1,8 +1,10 @@
-use std::{ops::ControlFlow, path::Path, process::{Command, Stdio}};
+use std::{ops::ControlFlow, path::Path, process::{Command, Stdio}, sync::Arc};
+use inquire::length;
 use regex::Regex;
+use reqwest::Client;
 use crate::{utils::cmd::{create_git_cmd, run_cmd_o, run_cmd_o_soft, run_cmd_s}, git_api::git_providers::{get_provider, GitProvider, Repo}, config::config::{Config, Profile}, utils::helper::{self, prntln, run_in_threads_default, MessageType}};
 
-pub async fn clone(directory: &str, user: bool, branch: String, regex: &str, reverse: bool, dry_run: bool, config: Config,
+pub async fn clone(directory: &str, user: bool, branch: String, regex: &str, reverse: bool, dry_run: bool, config: Config, client: Arc<Client>
 ) {
     let active_profile: Profile = config.active_profile().clone();
     let pat: Option<String> = Some(active_profile.clone().token);
@@ -10,13 +12,13 @@ pub async fn clone(directory: &str, user: bool, branch: String, regex: &str, rev
     // Find amount of repositories
     let provider: Box<dyn GitProvider> = get_provider(provider_type);
     let all_repos: Vec<Box<dyn Repo>> =
-        provider.get_repos(&pat, directory, user, active_profile.clone());
-
-    let re: Regex = Regex::new(regex).expect("Invalid regex pattern");
-    let repos_to_clone: Vec<Box<dyn Repo>> = all_repos
+        provider.get_repos(client, &pat, directory, user, active_profile.clone());
+        let re: Regex = Regex::new(regex).expect("Invalid regex pattern");
+        let repos_to_clone: Vec<Box<dyn Repo>> = all_repos
         .into_iter()
         .filter(|repo: &Box<dyn Repo>| (re.is_match(&repo.http_url()) || re.is_match(&repo.ssh_url())) ^ reverse)
         .collect();
+    prntln(&format!("\nCloning {} repositories from {}", repos_to_clone.len(), active_profile.baseaddress), MessageType::Neutral);
     run_in_threads_default(
         repos_to_clone,
         move |_thread_id: usize, repo: &Box<dyn Repo>| {
@@ -40,13 +42,13 @@ pub async fn clone(directory: &str, user: bool, branch: String, regex: &str, rev
                     true,
                 );
                 if status {
-                    helper::prntln(&format!("{} {} {}", "Repository", clone_url, "successfully cloned!"), MessageType::Success);
+                    helper::prntln(&format!("\n{} {} {}", "Repository", clone_url, "successfully cloned!"), MessageType::Success);
                 }
                 ControlFlow::Continue(())
             }
         },
     );
-    prntln("Finished cloning repositories", MessageType::Success);
+    prntln("\n\nFinished to clone repositories", MessageType::Success);
 }
 
 fn pull(branch: &String, destination_path: String, clone_url: &str, dry_run: bool) -> ControlFlow<()> {

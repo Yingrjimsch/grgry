@@ -1,4 +1,4 @@
-use std::process;
+use std::{process, sync::Arc};
 
 use crate::{git_api::github::GithubRepo, git_api::gitlab::GitlabRepo, config::config::Profile};
 use colored::Colorize;
@@ -12,9 +12,9 @@ use super::{github::Github, gitlab::Gitlab};
 
 // Define the trait in a common file (e.g., `git_provider.rs`)
 pub trait GitProvider {
-    fn get_page_number(&self, endpoint: &str, headers: Option<Vec<(String, String)>>) -> i32;
+    fn get_page_number(&self, client: Arc<Client>, endpoint: &str, headers: Option<Vec<(String, String)>>) -> i32;
     fn get_repos(
-        &self, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile,
+        &self, client: Arc<Client>, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile,
     ) -> Vec<Box<dyn Repo>>;
 }
 
@@ -25,6 +25,7 @@ pub trait Repo: Send + Sync {
 }
 
 pub async fn get_repos_paralell(
+    client: Arc<Client>,
     pages: i32,
     endpoint: &str,
     parameters: Option<Vec<(String, String)>>,
@@ -32,19 +33,19 @@ pub async fn get_repos_paralell(
     provider: &str, // Enum to distinguish between Github and Gitlab
 ) -> Vec<Box<dyn Repo>> {
     let mut tasks: Vec<task::JoinHandle<Result<Vec<Box<dyn Repo>>, reqwest::Error>>> = Vec::new();
-
     for page in 1..=pages {
         let endpoint_clone: String = endpoint.to_string();
         let mut parameters_clone: Option<Vec<(String, String)>> = parameters.clone();
         let headers_clone: Option<Vec<(String, String)>> = headers.clone();
         let provider: String = provider.to_string();
+        let client_clone = Arc::clone(&client);
         if let Some(params) = &mut parameters_clone {
             params.push(("page".to_string(), page.to_string()));
         }
 
         tasks.push(task::spawn(async move {
             let response: Response =
-                call_api(&endpoint_clone, parameters_clone.as_deref(), headers_clone.as_deref()).await;
+                call_api(&client_clone, &endpoint_clone, parameters_clone.as_deref(), headers_clone.as_deref()).await;
             let repos: Vec<Box<dyn Repo>> = match provider.as_str() {
                 "gitlab" => response
                     .json::<Vec<GitlabRepo>>()
@@ -74,9 +75,9 @@ pub async fn get_repos_paralell(
 }
 
 pub async fn call_api(
-    endpoint: &str, parameters: Option<&[(String, String)]>, headers: Option<&[(String, String)]>,
+    client: &Client, endpoint: &str, parameters: Option<&[(String, String)]>, headers: Option<&[(String, String)]>
 ) -> Response {
-    let client: Client = Client::builder().build().expect("error while build client");
+    // let client: Client = Client::builder().build().expect("error while build client");
     let mut request: reqwest::RequestBuilder = client.get(endpoint);
     // .header("User-Agent", "grgry-cli"); //TODO: check if user agent makes sense
     if let Some(params) = parameters {
