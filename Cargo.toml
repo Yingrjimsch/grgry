@@ -1,6 +1,6 @@
 [package]
 name = "grgry"
-version = "1.0.2"
+version = "1.0.3"
 authors = ["nobel98@bluewin.ch"]
 repository = "https://github.com/yingrjimsch/grgry"
 keywords = ["git", "mass", "regex", "repository-management"]
@@ -28,3 +28,8 @@ dirs = "5.0"
 futures = "0.3"
 colored = "2"
 ignore = "0.4"
+sys-info = "0.9.1"
+flate2 = "1.0"
+tar = "0.4"
+self-replace = "1.5.0"
+zip = "0.6"

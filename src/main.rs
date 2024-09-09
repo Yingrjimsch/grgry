@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::{process::Command, sync::Arc};
 
-use clap::Parser;
-use grgry::{cli::{clone, commands::{Commands, ProfileCommands}, mass, profile::{activate_profile_prompt, add_profile_prompt, delete_profile_prompt, show_profile}, quick}, config::config::Config};
+use clap::{CommandFactory, Parser};
+use grgry::{cli::{clone, commands::{Commands, ProfileCommands}, mass, profile::{activate_profile_prompt, add_profile_prompt, delete_profile_prompt, show_profile}, quick, update::download_latest_release}, config::config::Config, utils::cmd::{run_cmd_o, run_cmd_o_soft}};
 use reqwest::Client;
 
 #[derive(Parser)]
@@ -59,6 +59,7 @@ async fn main() {
             skip_interactive,
             dry_run,
         } => {
+            println!("Stuck3");
             let (regex, reverse) = regex_args.get_regex_args(".*");
             mass(command, &regex, reverse, *skip_interactive, *dry_run)
         }
@@ -68,9 +69,56 @@ async fn main() {
             ProfileCommands::Delete => delete_profile_prompt(&mut config),
             ProfileCommands::Show { all }=> show_profile(*all, config),
         },
-        // Commands::Test { } => {
-        //     // let reops = find_git_repos_parallel(None, ".*", false);
-        //     // println!("{:?}", reops);
-        // }
+        Commands::Alias { command } => {
+            let mut command_vec: Vec<String> = vec!["grgry".to_string(), "mass".to_string()];
+            let mut mass_command: String = String::new();
+            let mut command = command.into_iter();
+            while let Some(arg) = command.next() {
+                match arg.as_str() {
+                    // Check for recognized arguments
+                    "-s" | "--skip-interactive" | "--dry-run" => {
+                        command_vec.push(arg.to_string())
+                    },
+                    "--regex" | "--rev-regex" => {
+                        command_vec.push(arg.to_string());
+                        let regex_arg = command.next();
+                        match regex_arg {
+                            Some(argument) => command_vec.push(argument.to_string()),
+                            _ => {}
+                        };
+                    },
+                    _ => {
+                        if !mass_command.is_empty() {
+                            mass_command.push(' ');
+                        }
+                        mass_command.push_str(&arg);
+                    }
+                }
+            }
+            command_vec.insert(2, mass_command);
+            let cli = Cli::parse_from(command_vec);
+            if let Commands::Mass {
+                command,
+                regex_args,
+                skip_interactive,
+                dry_run,
+            } = cli.command
+            {
+                let (regex, reverse) = regex_args.get_regex_args(".*");
+                mass(&command, &regex, reverse, skip_interactive, dry_run)
+            }
+        },
+        Commands::Update { } => {
+            match download_latest_release().await {
+                Ok(_) => println!("Successfully updated grgry, check new version with grgry --version."),
+                Err(e) => eprintln!("Error: {}", e),
+            }
+        }
+        Commands::Test { } => {
+            match download_latest_release().await {
+                Ok(_) => println!("Success!"),
+                Err(e) => eprintln!("Error: {}", e),
+            }
+        }
     }
 }

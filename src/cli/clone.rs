@@ -1,11 +1,11 @@
-use std::{ops::ControlFlow, path::Path, process::{Command, Stdio}, sync::Arc};
-use inquire::length;
+use std::{ops::ControlFlow, path::Path, process::{Command, Stdio}, sync::Arc, time::Instant};
 use regex::Regex;
 use reqwest::Client;
 use crate::{utils::cmd::{create_git_cmd, run_cmd_o, run_cmd_o_soft, run_cmd_s}, git_api::git_providers::{get_provider, GitProvider, Repo}, config::config::{Config, Profile}, utils::helper::{self, prntln, run_in_threads_default, MessageType}};
 
 pub async fn clone(directory: &str, user: bool, branch: String, regex: &str, reverse: bool, dry_run: bool, config: Config, client: Arc<Client>
 ) {
+    // let now = Instant::now();
     let active_profile: Profile = config.active_profile().clone();
     let pat: Option<String> = Some(active_profile.clone().token);
     let provider_type: &str = &active_profile.provider;
@@ -18,6 +18,9 @@ pub async fn clone(directory: &str, user: bool, branch: String, regex: &str, rev
         .into_iter()
         .filter(|repo: &Box<dyn Repo>| (re.is_match(&repo.http_url()) || re.is_match(&repo.ssh_url())) ^ reverse)
         .collect();
+    // let elapsed = now.elapsed();
+    // println!("Elapsed: {:.2?}", elapsed);
+
     prntln(&format!("\nCloning {} repositories from {}", repos_to_clone.len(), active_profile.baseaddress), MessageType::Neutral);
     run_in_threads_default(
         repos_to_clone,
@@ -48,6 +51,9 @@ pub async fn clone(directory: &str, user: bool, branch: String, regex: &str, rev
             }
         },
     );
+    
+    // let elapsed = now.elapsed();
+    // println!("Elapsed: {:.2?}", elapsed);
     prntln("\n\nFinished to clone repositories", MessageType::Success);
 }
 

@@ -1,4 +1,4 @@
-use clap::Subcommand;
+use clap::{Parser, Subcommand};
 
 #[derive(Subcommand)]
 pub enum Commands {
@@ -99,7 +99,15 @@ pub enum Commands {
         #[clap(subcommand)]
         sub: ProfileCommands,
     },
-    // Test
+    #[command(about = "EXPERIMENTAL: add this as git alias to simply use git for mass commands.")]
+    Alias {
+        // This will collect all trailing arguments that are not part of options like `regex_args`.
+        #[arg(trailing_var_arg = true, value_name = "COMMAND", required = true, help = "This is the command to execute as if it was a git command without git prefix.")]
+        command: Vec<String>,
+    },
+    #[command(about = "EXPERIMENTAL: Update the grgry version in itself simply by calling grgry update.")]
+    Update,
+    Test,
 }
 
 #[derive(Subcommand)]

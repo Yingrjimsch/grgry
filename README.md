@@ -106,11 +106,13 @@ Contributions, improvements, and feature requests are welcome! Keep in mind that
 ## Tasks in progress
 - [ ] Release pipeline for cargo
 - [ ] Change the command about and long about to something clearer
-- [ ] Create submodules to structure the code / refactoring
+- [x] <del>Create submodules to structure the code / refactoring<del>
 - [x] <del>`grgry show` with parameter `--all` showing the current activated profile or all profiles</del>
 - [ ] add option to `pull --rebase` in `grgry quick`
 - [ ] add an option to `--ammend` commits
 - [x] <del>open issue with walkdir to stop at .git folder instead of traversing into the folder (speedup)</del>
-- [ ] try to work with https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/ to speeden up the git clone
-- [ ] quick default en mass instead of default singular
+- [ ] try to work with https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/ to speeden up the git clone (minimal speedup)
+- [x] <del>quick default en mass instead of default singular<del>
 - [ ] try https://statics.teams.cdn.office.net/evergreen-assets/safelinks/1/atp-safelinks.html for a `grgry update` functionallity
+- [ ] check if git is installed (if not assert break)
+- [ ] 

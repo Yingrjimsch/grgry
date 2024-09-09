@@ -7,8 +7,6 @@ use walkdir::WalkDir;
 use crate::{utils::cmd::{create_git_cmd, run_cmd_s}, utils::helper::{prntln, MessageType}};
 
 pub fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool, dry_run: bool) {
-    // let repos = find_git_repos_parallel(None, regex, reverse);
-
     process_repos(
         regex,
         reverse,
@@ -32,7 +30,7 @@ pub fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool, d
             }
         },
         |repo| {
-            let repo_path = repo.to_string_lossy();
+            let repo_path: std::borrow::Cow<'_, str> = repo.to_string_lossy();
             let args: Vec<&str> = ["-C", &repo_path]
                 .iter()
                 .copied()
