@@ -43,7 +43,7 @@ You can install grgry by [downloading](https://github.com/yingrjimsch/grgry/rele
 
   
 
-After that you can move it into your `/usr/local/bin` directory to make it executable on linux 
+After that you can move it into your `/usr/local/bin` directory to make it executable on linux:
 ```bash
 wget https://github.com/Yingrjimsch/grgry/releases/download/v1.0.3/grgry-v1.0.2-x86_64-unknown-linux-gnu.tar.gz
 tar -xvzf grgry-v1.0.2-x86_64-unknown-linux-gnu.tar.gz
@@ -74,8 +74,10 @@ grgry --version
 ```
   
   ###  Update
-  To update grgry you can either install it again following the example above or you can make use of the update command which automatically switches to the latest version
-  In unix systems this can be done by
+  To update grgry you can either install it again following the example above or you can make use of the update command which automatically switches to the latest version.
+
+
+  In unix systems this can be done by:
   
   ```bash
   sudo -E grgry update
@@ -94,7 +96,7 @@ touch  $HOME/.config/grgry.toml
 #or
 touch  ~/.config/grgry.toml
 ```
-
+or
 ```powershell
 New-Item $HOME\.config\grgry.toml -Force
 ```
@@ -103,7 +105,7 @@ This config file stores your [profiles](#Profile), which you can switch between 
 
 
 ### Chef's recommendation
-
+Coming soon
 
 ##  Available Commands
 
@@ -210,11 +212,8 @@ The `grgry update` command gets the latest release from GitHub and replaces the 
 
 ##  Contributions
 
-  
-
 Contributions, improvements, and feature requests are welcome! Keep in mind that this project was created for personal use and as a learning project for Rust. The goal was to make it adaptable and fast.
 
-  
 
 ##  Tasks in progress
 
