@@ -32,7 +32,10 @@ impl Config {
             Self::create_empty_config_file(&config_file_path);
         }
         let profiles: HashMap<String, Profile> = Self::load_profiles(&config_file_path);
-        Config { profiles, config_file_path }
+        Config {
+            profiles,
+            config_file_path,
+        }
     }
 
     fn get_default_config_path() -> PathBuf {
@@ -54,8 +57,11 @@ impl Config {
     }
 
     fn load_profiles<P: AsRef<Path>>(config_file_path: P) -> HashMap<String, Profile> {
-        let toml_content: String = fs::read_to_string(config_file_path).expect("Failed to read file");
-        let doc: DocumentMut = toml_content.parse::<DocumentMut>().expect("Failed to parse TOML");
+        let toml_content: String =
+            fs::read_to_string(config_file_path).expect("Failed to read file");
+        let doc: DocumentMut = toml_content
+            .parse::<DocumentMut>()
+            .expect("Failed to parse TOML");
 
         //TODO on load check if not empty (VALID)
         let mut profiles: HashMap<String, Profile> = HashMap::new();
@@ -91,8 +97,11 @@ impl Config {
 
     // Saves the current state of profiles back to the config file
     pub fn save_config(&self) {
-        let toml_content: String = fs::read_to_string(&self.config_file_path).expect("Failed to read file");
-        let mut doc: DocumentMut = toml_content.parse::<DocumentMut>().expect("Failed to parse TOML");
+        let toml_content: String =
+            fs::read_to_string(&self.config_file_path).expect("Failed to read file");
+        let mut doc: DocumentMut = toml_content
+            .parse::<DocumentMut>()
+            .expect("Failed to parse TOML");
 
         // Remove profiles that are no longer in the HashMap
         let existing_keys: Vec<String> = doc.iter().map(|(key, _)| key.to_string()).collect();
@@ -132,7 +141,11 @@ impl Config {
     }
 
     pub fn active_profile(&self) -> &Profile {
-        match self.profiles.values().find(|profile: &&Profile| profile.active) {
+        match self
+            .profiles
+            .values()
+            .find(|profile: &&Profile| profile.active)
+        {
             Some(profile) => profile,
             None => {
                 eprintln!(

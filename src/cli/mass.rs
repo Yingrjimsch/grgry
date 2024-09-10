@@ -1,17 +1,26 @@
-use std::{env::current_dir, path::{Path, PathBuf}};
+use crate::{
+    utils::cmd::{create_git_cmd, run_cmd_s},
+    utils::helper::{prntln, MessageType},
+};
 use colored::Colorize;
 use inquire::{validator::Validation, CustomType, InquireError};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use regex::Regex;
+use std::{
+    env::current_dir,
+    path::{Path, PathBuf},
+};
 use walkdir::WalkDir;
-use crate::{utils::cmd::{create_git_cmd, run_cmd_s}, utils::helper::{prntln, MessageType}};
 
 pub fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool, dry_run: bool) {
     process_repos(
         regex,
         reverse,
         |repo| {
-            prntln(&format!("{} {}", "Repository found at:", repo.display()), MessageType::Neutral);
+            prntln(
+                &format!("{} {}", "Repository found at:", repo.display()),
+                MessageType::Neutral,
+            );
 
             if skip_interactive {
                 return Ok(true);
@@ -19,14 +28,18 @@ pub fn mass(command: &str, regex: &str, reverse: bool, skip_interactive: bool, d
 
             let prompt = format!("Do you want to execute {}? (y/n):", command);
             let result = CustomType::<String>::new(&prompt)
-                    .with_validator(|input: &String| match input.to_lowercase().as_str() {
-                        "y" | "n" => Ok(Validation::Valid),
-                        other => Ok(Validation::Invalid(format!("Invalid argument {}. Please enter 'y' or 'n'", other).red().into())),
-                    })
-                    .prompt();
+                .with_validator(|input: &String| match input.to_lowercase().as_str() {
+                    "y" | "n" => Ok(Validation::Valid),
+                    other => Ok(Validation::Invalid(
+                        format!("Invalid argument {}. Please enter 'y' or 'n'", other)
+                            .red()
+                            .into(),
+                    )),
+                })
+                .prompt();
             match result {
                 Ok(choice) => Ok(choice.to_lowercase() == "y"),
-                Err(err) => Err(err),  // Propagate the error, which will exit the loop
+                Err(err) => Err(err), // Propagate the error, which will exit the loop
             }
         },
         |repo| {
@@ -47,7 +60,6 @@ where
     F: Fn(&PathBuf) -> Result<bool, InquireError>,
     G: Fn(&PathBuf),
 {
-    
     let repos: Vec<PathBuf> = find_git_repos_parallel(None, &regex, reverse);
     for repo in repos {
         match interactive_fn(&repo) {
@@ -71,7 +83,10 @@ fn find_git_repos_parallel(root: Option<&Path>, pattern: &str, reverse: bool) ->
         .filter_entry(|entry| {
             let path = entry.path();
             // Continue descending only if the directory does not contain a .git folder
-            !path.parent().map(|p| p.join(".git").is_dir()).unwrap_or(false)
+            !path
+                .parent()
+                .map(|p| p.join(".git").is_dir())
+                .unwrap_or(false)
         })
         .par_bridge()
         // Convert iterator to a parallel iterator

@@ -2,19 +2,31 @@ use std::{collections::HashMap, process};
 
 use inquire::{required, Confirm, InquireError, Select, Text};
 
-use crate::{config::config::{Config, Profile}, utils::helper::{prntln, MessageType}};
+use crate::{
+    config::config::{Config, Profile},
+    utils::helper::{prntln, MessageType},
+};
 
 pub fn show_profile(all: bool, config: Config) {
     if all {
-        prntln(&serde_json::to_string_pretty(&config).unwrap(), MessageType::Neutral)
+        prntln(
+            &serde_json::to_string_pretty(&config.active_profile()).unwrap(),
+            MessageType::Neutral,
+        )
     } else {
-        prntln(&serde_json::to_string_pretty(&config).unwrap(), MessageType::Neutral)
+        prntln(
+            &serde_json::to_string_pretty(&config).unwrap(),
+            MessageType::Neutral,
+        )
     }
 }
 
 pub fn delete_profile_prompt(config: &mut Config) {
     let profiles_cloned: HashMap<String, Profile> = do_clone(&config.profiles);
-    let profile_keys: Vec<&str> = profiles_cloned.keys().map(|key: &String| key.as_str()).collect();
+    let profile_keys: Vec<&str> = profiles_cloned
+        .keys()
+        .map(|key: &String| key.as_str())
+        .collect();
     let profile_to_delete_key: Result<&str, InquireError> =
         Select::new("Which profile do you want to delete?", profile_keys).prompt();
 
@@ -49,7 +61,9 @@ pub fn add_profile_prompt(config: &mut Config) {
 
     let target_base_path: Result<String, InquireError> = Text::new("target base path:")
         .with_validator(required!("This field is required"))
-        .with_help_message("The absolute path where the repos should be cloned to (e.g. /home/you/repos)")
+        .with_help_message(
+            "The absolute path where the repos should be cloned to (e.g. /home/you/repos)",
+        )
         .with_default("")
         .prompt();
     match target_base_path {
@@ -100,7 +114,9 @@ pub fn add_profile_prompt(config: &mut Config) {
     };
 
     let token: Result<String, InquireError> = Text::new("token:")
-        .with_help_message("The token to access the provider, if empty only public repos can be cloned")
+        .with_help_message(
+            "The token to access the provider, if empty only public repos can be cloned",
+        )
         .with_default("")
         .prompt();
     match token {
@@ -146,7 +162,10 @@ fn do_clone<K: Clone, V: Clone>(data: &HashMap<K, V>) -> HashMap<K, V> {
 
 pub fn activate_profile_prompt(config: &mut Config) {
     let profiles_cloned: HashMap<String, Profile> = do_clone(&config.profiles);
-    let profile_keys: Vec<&str> = profiles_cloned.keys().map(|key: &String| key.as_str()).collect();
+    let profile_keys: Vec<&str> = profiles_cloned
+        .keys()
+        .map(|key: &String| key.as_str())
+        .collect();
 
     let profile_to_activate_key: Result<&str, InquireError> =
         Select::new("Choose profile to activate:", profile_keys).prompt();

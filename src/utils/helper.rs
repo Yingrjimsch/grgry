@@ -1,4 +1,7 @@
-use std::{sync::{mpsc, Arc}, thread::{self, available_parallelism}};
+use std::{
+    sync::{mpsc, Arc},
+    thread::{self, available_parallelism},
+};
 
 use colored::*; // Make sure to add `colored` crate to Cargo.toml
 

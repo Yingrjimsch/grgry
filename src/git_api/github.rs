@@ -6,8 +6,8 @@ use serde::Deserialize;
 use tokio::task::block_in_place;
 
 use crate::{
-    git_api::git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
     config::config::Profile,
+    git_api::git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
 };
 const PER_PAGE: i16 = 100;
 
@@ -35,13 +35,19 @@ impl Repo for GithubRepo {
 pub struct Github;
 impl GitProvider for Github {
     fn get_repos(
-        &self, client: Arc<Client>, pat: &Option<String>, collection_name: &str, user: bool, active_profile: Profile,
+        &self,
+        client: Arc<Client>,
+        pat: &Option<String>,
+        collection_name: &str,
+        user: bool,
+        active_profile: Profile,
     ) -> Vec<Box<dyn Repo>> {
         block_in_place(|| {
             let future = async {
                 let collection_searchstring: &str = match user {
                     true => {
-                        if active_profile.username == collection_name && active_profile.token != "" {
+                        if active_profile.username == collection_name && active_profile.token != ""
+                        {
                             "user"
                         } else {
                             &format!("users/{}", collection_name)
@@ -49,7 +55,10 @@ impl GitProvider for Github {
                     }
                     false => &format!("orgs/{}", collection_name),
                 };
-                let endpoint: String = format!("{}/{}/repos", &active_profile.baseaddress, collection_searchstring); //here the replace / --> %2F is not done because Github projects are top level on org or on user
+                let endpoint: String = format!(
+                    "{}/{}/repos",
+                    &active_profile.baseaddress, collection_searchstring
+                ); //here the replace / --> %2F is not done because Github projects are top level on org or on user
                 let headers: Option<Vec<(String, String)>> = match pat {
                     Some(token) => Some(vec![
                         ("Authorization".to_string(), token.clone()),
@@ -57,10 +66,19 @@ impl GitProvider for Github {
                     ]),
                     None => None,
                 };
-                let pages: i32 = self.get_page_number(Arc::clone(&client), &endpoint, headers.clone());
+                let pages: i32 =
+                    self.get_page_number(Arc::clone(&client), &endpoint, headers.clone());
                 let parameters: Option<Vec<(String, String)>> =
                     Some(vec![("per_page".to_string(), PER_PAGE.to_string())]);
-                get_repos_paralell(client, pages, &endpoint, parameters, headers, &active_profile.provider).await
+                get_repos_paralell(
+                    client,
+                    pages,
+                    &endpoint,
+                    parameters,
+                    headers,
+                    &active_profile.provider,
+                )
+                .await
             };
 
             // Block on the async task, so it runs to completion and returns the result.
@@ -69,14 +87,20 @@ impl GitProvider for Github {
         })
     }
 
-    fn get_page_number(&self, client: Arc<Client>, endpoint: &str, headers: Option<Vec<(String, String)>>) -> i32 {
+    fn get_page_number(
+        &self,
+        client: Arc<Client>,
+        endpoint: &str,
+        headers: Option<Vec<(String, String)>>,
+    ) -> i32 {
         block_in_place(|| {
             let future = async {
                 let parameters: Option<Vec<(String, String)>> = Some(vec![
                     ("page".to_string(), "1".to_string()),
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
-                let resp_total_repos: Response = call_api(&client, endpoint, parameters.as_deref(), headers.as_deref()).await;
+                let resp_total_repos: Response =
+                    call_api(&client, endpoint, parameters.as_deref(), headers.as_deref()).await;
                 let pages: i32 = match resp_total_repos.headers().get("link") {
                     Some(page) => {
                         let re: Regex = Regex::new(r"page=(\d+)").unwrap();
