@@ -105,7 +105,24 @@ This config file stores your [profiles](#Profile), which you can switch between 
 
 
 ### Chef's recommendation
-Coming soon
+To keep using one cli tool aliases can be created that map the great functionality into git commands.
+For `grgry clone` and `grgry quick` it is straightfoward, for `grgry mass` a special command `alias` can be used that provides a better usage, instead of writing `grgry mass "status --porcelain" --regex ".*"` the alias allows you to run `git mass status --porcelain --regex ".*"` without any apostrophes whatsoever.
+
+Linux:
+```bash
+git config --global alias.gclone '!grgry clone'
+git config --global alias.quick '!grgry quick'
+git config --global alias.mass '!grgry alias'
+```
+
+
+Windows:
+```powershell
+git config --global alias.gclone "!grgry clone"
+git config --global alias.quick "!grgry quick"
+git config --global alias.mass "!grgry alias"
+```
+
 
 ##  Available Commands  
 
