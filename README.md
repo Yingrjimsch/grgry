@@ -107,9 +107,7 @@ This config file stores your [profiles](#Profile), which you can switch between 
 ### Chef's recommendation
 Coming soon
 
-##  Available Commands
-
-  
+##  Available Commands  
 
 ###  Clone
 

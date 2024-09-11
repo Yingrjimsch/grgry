@@ -42,41 +42,44 @@ pub fn quick(
                 return Ok(true);
             }
 
-            let result = CustomType::<String>::new(
-                "Do you want to quicken this repo? (y)es/(n)o/(m)ore information:",
-            )
-            .with_validator(|input: &String| match input.to_lowercase().as_str() {
-                "y" | "n" | "m" => Ok(Validation::Valid),
-                other => Ok(Validation::Invalid(
-                    format!("Invalid argument {}. Please enter 'y' or 'n'", other)
-                        .red()
-                        .into(),
-                )),
-            })
-            .prompt();
-            match result {
-                Ok(choice) => match choice.to_lowercase().as_str() {
-                    "y" => Ok(true),
-                    "n" => Ok(false),
-                    "m" => {
-                        run_cmd_s(create_git_cmd(&repo_path).arg("diff"), dry_run, false);
-                        prntln(
-                            &format!("{:<10}: {}", "URL", get_remote_url(&repo_path, dry_run)),
-                            MessageType::Success,
-                        );
-                        prntln(
-                            &format!(
-                                "{:<10}: {}",
-                                "Branch",
-                                get_current_branch(&repo_path, dry_run)
-                            ),
-                            MessageType::Success,
-                        );
-                        Ok(false)
-                    }
-                    _ => unreachable!(),
-                },
-                Err(err) => Err(err),
+            loop {
+
+                let result = CustomType::<String>::new(
+                    "Do you want to quicken this repo? (y)es/(n)o/(m)ore information:",
+                )
+                .with_validator(|input: &String| match input.to_lowercase().as_str() {
+                    "y" | "n" | "m" => Ok(Validation::Valid),
+                    other => Ok(Validation::Invalid(
+                        format!("Invalid argument {}. Please enter 'y' or 'n'", other)
+                            .red()
+                            .into(),
+                    )),
+                })
+                .prompt();
+                match result {
+                    Ok(choice) => match choice.to_lowercase().as_str() {
+                        "y" => return Ok(true),
+                        "n" => return Ok(false),
+                        "m" => {
+                            run_cmd_s(create_git_cmd(&repo_path).arg("diff"), dry_run, false);
+                            prntln(
+                                &format!("{:<10}: {}", "URL", get_remote_url(&repo_path, dry_run)),
+                                MessageType::Success,
+                            );
+                            prntln(
+                                &format!(
+                                    "{:<10}: {}",
+                                    "Branch",
+                                    get_current_branch(&repo_path, dry_run)
+                                ),
+                                MessageType::Success,
+                            );
+                            // Ok(false)
+                        }
+                        _ => unreachable!(),
+                    },
+                    Err(err) => return Err(err),
+                }
             }
         },
         |repo| {
@@ -117,11 +120,6 @@ fn select_profile<'a>(config: &'a Config, remote_url: &str) -> &'a Profile {
 
 fn execute_quick_actions(repo_path: &str, profile: &Profile, message: &str, dry_run: bool) {
     run_cmd_s(
-        create_git_cmd(repo_path).args(&["pull", "--rebase"]),
-        dry_run,
-        true,
-    );
-    run_cmd_s(
         create_git_cmd(repo_path).args(&["config", "user.name", &profile.username]),
         dry_run,
         true,
@@ -137,7 +135,11 @@ fn execute_quick_actions(repo_path: &str, profile: &Profile, message: &str, dry_
         dry_run,
         true,
     );
-
+    run_cmd_s(
+        create_git_cmd(repo_path).args(&["pull", "--rebase"]),
+        dry_run,
+        true,
+    );
     let branch = get_current_branch(repo_path, dry_run);
     let set_upstream = run_cmd_o(
         create_git_cmd(repo_path).args(&["ls-remote", "--heads", "origin", &branch]),
