@@ -67,7 +67,7 @@ pub async fn clone(
             } else {
                 let status: bool = run_cmd_s(
                     Command::new("git")
-                        .args(&create_pull_request_args(
+                        .args(&create_clone_args(
                             &branch,
                             &clone_url,
                             &active_profile.targetbasepath,
@@ -168,7 +168,7 @@ fn get_clone_url<'a>(pulloption: &'a str, repo: &'a Box<dyn Repo>) -> &'a str {
     return clone_url;
 }
 
-fn create_pull_request_args(
+fn create_clone_args(
     branch: &str,
     clone_url: &str,
     target_basepath: &str,
@@ -176,6 +176,7 @@ fn create_pull_request_args(
 ) -> Vec<String> {
     let mut args: Vec<String> = vec![
         "clone".to_string(),
+        "--filter=blob:none".to_string(),
         clone_url.to_string(),
         format!("{}/{}", target_basepath, directory),
     ];
