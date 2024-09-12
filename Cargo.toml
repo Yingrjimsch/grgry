@@ -1,6 +1,6 @@
 [package]
 name = "grgry"
-version = "1.0.3"
+version = "1.1.1"
 authors = ["nobel98@bluewin.ch"]
 repository = "https://github.com/yingrjimsch/grgry"
 keywords = ["git", "mass", "regex", "repository-management"]

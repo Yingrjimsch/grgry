@@ -45,16 +45,16 @@ You can install grgry by [downloading](https://github.com/yingrjimsch/grgry/rele
 
 After that you can move it into your `/usr/local/bin` directory to make it executable on linux:
 ```bash
-wget https://github.com/Yingrjimsch/grgry/releases/download/v1.0.3/grgry-v1.0.2-x86_64-unknown-linux-gnu.tar.gz
-tar -xvzf grgry-v1.0.2-x86_64-unknown-linux-gnu.tar.gz
-sudo mv grgry-v1.0.2-x86_64-unknown-linux-gnu/grgry /usr/local/bin/
-rm -rf grgry-v1.0.2*
+wget https://github.com/Yingrjimsch/grgry/releases/download/v1.1.1/grgry-v1.1.1-x86_64-unknown-linux-gnu.tar.gz
+tar -xvzf grgry-v1.1.1-x86_64-unknown-linux-gnu.tar.gz
+sudo mv grgry-v1.1.1-x86_64-unknown-linux-gnu/grgry /usr/local/bin/
+rm -rf grgry-v1.1.1*
 grgry --version
 ```
 or add it to your environment variables on **windows** with powershell (as admin):
 ```powershell
-$zipUrl = "https://github.com/Yingrjimsch/grgry/releases/download/v1.0.2/grgry-v1.0.2-x86_64-pc-windows-msvc.zip"
-$zipFileName = "grgry-v1.0.2-x86_64-pc-windows-msvc"
+$zipUrl = "https://github.com/Yingrjimsch/grgry/releases/download/v1.1.1/grgry-v1.1.1-x86_64-pc-windows-msvc.zip"
+$zipFileName = "grgry-v1.1.1-x86_64-pc-windows-msvc"
 $zipFile = "$zipFileName.zip"
 $extractDir = "$zipFileName-extracted"
 $destinationPath = "C:\Program Files\grgry"
