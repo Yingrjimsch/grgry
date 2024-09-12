@@ -49,6 +49,7 @@ wget https://github.com/Yingrjimsch/grgry/releases/download/v1.0.3/grgry-v1.0.2-
 tar -xvzf grgry-v1.0.2-x86_64-unknown-linux-gnu.tar.gz
 sudo mv grgry-v1.0.2-x86_64-unknown-linux-gnu/grgry /usr/local/bin/
 rm -rf grgry-v1.0.2*
+grgry --version
 ```
 or add it to your environment variables on **windows** with powershell (as admin):
 ```powershell
@@ -89,6 +90,9 @@ The configuration file should be created the first time you execute the `grgry` 
 
 If you want to manually create a configuration file, add a file named ***grgry.toml*** inside the ***.config*** folder in your **$HOME** directory
 
+
+Linux:
+
 ```bash
 mkdir $HOME/.config
 
@@ -96,7 +100,7 @@ touch  $HOME/.config/grgry.toml
 #or
 touch  ~/.config/grgry.toml
 ```
-or
+or Windows:
 ```powershell
 New-Item $HOME\.config\grgry.toml -Force
 ```
@@ -105,8 +109,9 @@ This config file stores your [profiles](#Profile), which you can switch between 
 
 
 ### Chef's recommendation
-To keep using one cli tool aliases can be created that map the great functionality into git commands.
-For `grgry clone` and `grgry quick` it is straightfoward, for `grgry mass` a special command `alias` can be used that provides a better usage, instead of writing `grgry mass "status --porcelain" --regex ".*"` the alias allows you to run `git mass status --porcelain --regex ".*"` without any apostrophes whatsoever.
+To simplify workflow aliases can be created that map the great grgry functionality into git commands.
+For `grgry clone` and `grgry quick` it is straightfoward, for `grgry mass` a special command `alias` can be used providing a smoother usage, instead of writing `grgry mass "status --porcelain" --regex ".*"` the alias allows you to run `git mass status --porcelain --regex ".*"` without any apostrophes whatsoever.
+
 
 Linux:
 ```bash
