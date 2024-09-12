@@ -1,10 +1,12 @@
+use std::sync::Arc;
+
 use regex::Regex;
-use reqwest::Response;
+use reqwest::{Client, Response};
 use serde::Deserialize;
 use tokio::task::block_in_place;
 
 use crate::{
-    profile::config::Profile,
+    config::config::Profile,
     git_api::git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
 };
 const PER_PAGE: i16 = 100;
@@ -34,6 +36,7 @@ pub struct Github;
 impl GitProvider for Github {
     fn get_repos(
         &self,
+        client: Arc<Client>,
         pat: &Option<String>,
         collection_name: &str,
         user: bool,
@@ -63,10 +66,12 @@ impl GitProvider for Github {
                     ]),
                     None => None,
                 };
-                let pages: i32 = self.get_page_number(&endpoint, headers.clone());
+                let pages: i32 =
+                    self.get_page_number(Arc::clone(&client), &endpoint, headers.clone());
                 let parameters: Option<Vec<(String, String)>> =
                     Some(vec![("per_page".to_string(), PER_PAGE.to_string())]);
                 get_repos_paralell(
+                    client,
                     pages,
                     &endpoint,
                     parameters,
@@ -82,7 +87,12 @@ impl GitProvider for Github {
         })
     }
 
-    fn get_page_number(&self, endpoint: &str, headers: Option<Vec<(String, String)>>) -> i32 {
+    fn get_page_number(
+        &self,
+        client: Arc<Client>,
+        endpoint: &str,
+        headers: Option<Vec<(String, String)>>,
+    ) -> i32 {
         block_in_place(|| {
             let future = async {
                 let parameters: Option<Vec<(String, String)>> = Some(vec![
@@ -90,7 +100,7 @@ impl GitProvider for Github {
                     ("per_page".to_string(), PER_PAGE.to_string()),
                 ]);
                 let resp_total_repos: Response =
-                    call_api(endpoint, parameters.as_deref(), headers.as_deref()).await;
+                    call_api(&client, endpoint, parameters.as_deref(), headers.as_deref()).await;
                 let pages: i32 = match resp_total_repos.headers().get("link") {
                     Some(page) => {
                         let re: Regex = Regex::new(r"page=(\d+)").unwrap();

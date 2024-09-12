@@ -57,7 +57,8 @@ impl Config {
     }
 
     fn load_profiles<P: AsRef<Path>>(config_file_path: P) -> HashMap<String, Profile> {
-        let toml_content: String = fs::read_to_string(config_file_path).expect("Failed to read file");
+        let toml_content: String =
+            fs::read_to_string(config_file_path).expect("Failed to read file");
         let doc: DocumentMut = toml_content
             .parse::<DocumentMut>()
             .expect("Failed to parse TOML");
@@ -96,7 +97,7 @@ impl Config {
 
     // Saves the current state of profiles back to the config file
     pub fn save_config(&self) {
-        let mut toml_content: String =
+        let toml_content: String =
             fs::read_to_string(&self.config_file_path).expect("Failed to read file");
         let mut doc: DocumentMut = toml_content
             .parse::<DocumentMut>()
@@ -140,10 +141,17 @@ impl Config {
     }
 
     pub fn active_profile(&self) -> &Profile {
-        match self.profiles.values().find(|profile: &&Profile| profile.active) {
+        match self
+            .profiles
+            .values()
+            .find(|profile: &&Profile| profile.active)
+        {
             Some(profile) => profile,
             None => {
-                eprintln!("{}", "One profile needs to be activated. For activating a profile use grgry profile activate!".red());
+                eprintln!(
+                    "{}",
+                    "One profile needs to be activated. For activating a profile use grgry profile activate!".red()
+                );
                 std::process::exit(1);
             }
         }
