@@ -1,19 +1,8 @@
-
-  
-
 #  grgry
-
-  
-
-  
 
 **grgry** (pronounced "**gregory**") is a CLI tool designed to perform git operations en masse, allowing you to bulk execute git commands across multiple repositories. It is heavily inspired by [ghorg](https://github.com/gabrie30/ghorg) and written in Rust as an introduction to the language.
 
-  
-
 ##  Why grgry?
-
-  
 
 grgry is particularly helpful if you need to:
 
@@ -23,25 +12,18 @@ grgry is particularly helpful if you need to:
 
 3. Manage multiple git providers and accounts simultaneously.
 
-  
-
 ##  Supported Providers
 
 1. Github
 
 2. Gitlab
-
   
-
 ##  Setup
-
-  
 
 ###  Installation
 
 You can install grgry by [downloading](https://github.com/yingrjimsch/grgry/releases) the binaries directly.
 
-  
 
 After that you can move it into your `/usr/local/bin` directory to make it executable on linux:
 ```bash
