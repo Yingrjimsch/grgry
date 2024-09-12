@@ -108,7 +108,7 @@ async fn main() {
                 mass(&command, &regex, reverse, skip_interactive, dry_run)
             }
         }
-        Commands::Update {} => match update().await {
+        Commands::Update {} => match update(client).await {
             Ok(_) => {
                 println!("Successfully updated grgry, check new version with grgry --version.")
             }

@@ -5,6 +5,7 @@ use std::env;
 use std::error::Error;
 use std::io::{self, Seek};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use sys_info;
 
 #[cfg(target_family = "unix")]
@@ -52,8 +53,8 @@ async fn determine_asset_pattern() -> Result<(String, String), Box<dyn Error>> {
     Ok((arch_str.to_string(), os_str.to_string()))
 }
 
-pub async fn update() -> Result<(), Box<dyn Error>> {
-    let client = Client::new();
+pub async fn update(client: Arc<Client>) -> Result<(), Box<dyn Error>> {
+    // let client = Client::builder().build();
     let api_url = "https://api.github.com/repos/Yingrjimsch/grgry/releases/latest";
     let response = client
         .get(api_url)
