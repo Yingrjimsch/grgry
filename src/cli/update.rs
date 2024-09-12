@@ -96,7 +96,12 @@ pub async fn update(client: Arc<Client>) -> Result<(), Box<dyn Error>> {
         .await?;
 
     extract(io::Cursor::new(response), &tmp_dir)?;
+    
+    #[cfg(target_family = "unix")]
     let binary_file_name = tmp_dir.join("grgry");
+    #[cfg(target_family = "windows")]
+    let binary_file_name = tmp_dir.join("grgry.exe");
+
     self_replace::self_replace(&binary_file_name)?;
 
     Ok(())
@@ -109,12 +114,13 @@ fn extract<R: io::Read + Seek>(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let tar = GzDecoder::new(reader);
     let mut archive = Archive::new(tar);
+    let mut target_path: PathBuf;
 
     for entry in archive.entries()? {
         let mut entry = entry?;
         let entry_path = entry.path()?.to_path_buf();
         let file_name = entry_path.file_name().ok_or("Failed to get file name")?;
-        let target_path: PathBuf = target_dir.join(file_name);
+        target_path = target_dir.join(file_name);
 
         if file_name.to_string_lossy() != "grgry" {
             continue;
