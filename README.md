@@ -237,32 +237,23 @@ Contributions, improvements, and feature requests are welcome! Keep in mind that
 
 ##  Tasks in progress
 
-- [ ] Release pipeline for cargo
-
+- [x]  <del>Create submodules to structure the code / refactoring<del>
+- [x]  <del>`grgry show` with parameter `--all` showing the current activated profile or all profiles</del>
+- [x]  <del>add option to `pull --rebase` in `grgry quick`<del>
+- [x]  <del>open issue with walkdir to stop at .git folder instead of traversing into the folder (speedup)</del>
+- [x]  <del>quick default en mass instead of default singular<del>
+- [x]  <del>try https://statics.teams.cdn.office.net/evergreen-assets/safelinks/1/atp-safelinks.html for a `grgry update` functionallity<del>
+- [x]  <del>check if git is installed (if not assert break)<del>
+- [x]  <del>create alias for git to use instead of mass<del>
+- [x]  <del>force clone to remove `targetbasepath` and reclone from scratch<del>
+- [x] <del>try to work with https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/ to speeden up the git clone --> implemented `--filter=blob:none`<del>
 - [ ] Change the command about and long about to something clearer
-
--  [x]  <del>Create submodules to structure the code / refactoring<del>
-
--  [x]  <del>`grgry show` with parameter `--all` showing the current activated profile or all profiles</del>
-
--  [x]  <del>add option to `pull --rebase` in `grgry quick`<del>
-
+- [ ] Release pipeline for cargo
 - [ ] add an option to `--ammend` commits
-
--  [x]  <del>open issue with walkdir to stop at .git folder instead of traversing into the folder (speedup)</del>
-
-- [ ] try to work with https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/ to speeden up the git clone --> minimal speedup leads to lower prio
-
--  [x]  <del>quick default en mass instead of default singular<del>
-
--  [x]  <del>try https://statics.teams.cdn.office.net/evergreen-assets/safelinks/1/atp-safelinks.html for a `grgry update` functionallity<del>
-
--  [x]  <del>check if git is installed (if not assert break)<del>
-
--  [x]  <del>create alias for git to use instead of mass<del>
-
--  [x]  <del>force clone to remove `targetbasepath` and reclone from scratch<del>
-
 - [ ] add configurable `grgry quick` for people that don't want to follow the same workflow
-
 - [ ] quick, clone, mass in three different ways: interactive, multiselect, skip-interactive (regex still working in addition) (default interactive)
+- [ ] parameter to exclude archived projects from `grgry clone`
+- [ ] update news if there is a new version available
+- [ ] `grgry update` check if current version <> newest version and show a select of all newer versions to decide which to upgrade to
+- [ ] possibility of skip interactive during interaction for `grgry mass` and `grgry quick`
+- [ ] updating the print lines to be more cheerful
