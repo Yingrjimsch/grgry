@@ -1,1 +1,4 @@
 /target
+.aider*
+.env
+.aifo-coder.lock
