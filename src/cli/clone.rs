@@ -1,7 +1,7 @@
 use crate::{
     config::config::{Config, Profile},
     git_api::git_providers::{get_provider, GitProvider, Repo},
-    utils::cmd::{create_git_cmd, run_cmd_o, run_cmd_o_soft, run_cmd_s, run_cmd_s_retry},
+    utils::cmd::{create_git_cmd, run_cmd_o, run_cmd_o_soft, run_cmd_s_retry},
     utils::helper::{self, prntln, run_in_threads, MessageType},
 };
 use regex::Regex;

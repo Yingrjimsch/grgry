@@ -73,7 +73,7 @@ pub fn run_cmd_s(mut command: &mut Command, test: bool, silent: bool) -> bool {
 
 /// Execute a command and, on failure, return an error string (including stderr/stdout).
 /// This is meant for "mass" operations where we want to continue processing other repos.
-pub fn run_cmd_s_soft(mut command: &mut Command, test: bool, silent: bool) -> Result<(), String> {
+pub fn run_cmd_s_soft(command: &mut Command, test: bool, silent: bool) -> Result<(), String> {
     if test {
         let cmd_str: String = command_to_string(command);
         println!("Executing: {}", cmd_str);
