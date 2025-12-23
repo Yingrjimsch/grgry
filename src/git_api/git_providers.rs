@@ -120,7 +120,16 @@ pub async fn call_api(
         }
     };
 
-    return response;
+    if !response.status().is_success() {
+        eprintln!(
+            "{} {} ({})",
+            "API request returned non-success status:".red(),
+            response.status().to_string().red(),
+            endpoint
+        );
+    }
+
+    response
 }
 
 pub fn get_provider(provider_type: &str) -> Box<dyn GitProvider> {

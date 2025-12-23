@@ -5,9 +5,11 @@ use crate::{
     git_api::git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
 };
 
+use colored::Colorize;
 use reqwest::{Client, Response};
 use serde::Deserialize;
 use tokio::task::block_in_place;
+
 const PER_PAGE: i16 = 100;
 
 #[derive(Debug, Deserialize)]
@@ -47,11 +49,14 @@ impl GitProvider for Gitlab {
                     true => "users",
                     false => "groups",
                 };
+                let encoded_collection_name: String =
+                    urlencoding::encode(collection_name).into_owned();
+
                 let endpoint: String = format!(
                     "{}/api/v4/{}/{}/projects",
                     active_profile.baseaddress,
                     collection_type,
-                    collection_name.replace("/", "%2F")
+                    encoded_collection_name
                 );
                 let headers: Option<Vec<(String, String)>> = match pat {
                     Some(token) => Some(vec![
@@ -100,16 +105,31 @@ impl GitProvider for Gitlab {
                 ]);
                 let resp_total_repos: Response =
                     call_api(&client, endpoint, parameters.as_deref(), headers.as_deref()).await;
-                return resp_total_repos
+
+                if !resp_total_repos.status().is_success() {
+                    let status = resp_total_repos.status();
+                    let body = resp_total_repos.text().await.unwrap_or_default();
+                    eprintln!(
+                        "{} {} {}\nEndpoint: {}\nResponse body:\n{}",
+                        "GitLab API request failed with status".red(),
+                        status.to_string().red(),
+                        "- cannot determine pagination.".red(),
+                        endpoint,
+                        body
+                    );
+                    return 0;
+                }
+
+                resp_total_repos
                     .headers()
                     .get("x-total-pages")
                     .and_then(|hv: &reqwest::header::HeaderValue| hv.to_str().ok())
                     .and_then(|s: &str| s.parse::<i32>().ok())
-                    .unwrap();
+                    .unwrap_or(1)
             };
             // Block on the async task, so it runs to completion and returns the result.
-            let repos: i32 = tokio::runtime::Handle::current().block_on(future);
-            repos
+            let pages: i32 = tokio::runtime::Handle::current().block_on(future);
+            if pages <= 0 { 1 } else { pages }
         })
     }
 }
