@@ -1,8 +1,8 @@
 use crate::{
     config::config::{Config, Profile},
     git_api::git_providers::{get_provider, GitProvider, Repo},
-    utils::cmd::{create_git_cmd, run_cmd_o, run_cmd_o_soft, run_cmd_s},
-    utils::helper::{self, prntln, run_in_threads_default, MessageType},
+    utils::cmd::{create_git_cmd, run_cmd_o, run_cmd_o_soft, run_cmd_s, run_cmd_s_retry},
+    utils::helper::{self, prntln, run_in_threads, MessageType},
 };
 use regex::Regex;
 use reqwest::Client;
@@ -54,7 +54,10 @@ pub async fn clone(
         ),
         MessageType::Neutral,
     );
-    run_in_threads_default(
+    // Limit concurrency for network-heavy git operations to reduce SSH connection resets.
+    // (Fixes flaky failures like "kex_exchange_identification" when running many fetch/clone in parallel.)
+    run_in_threads(
+        4,
         repos_to_clone,
         move |_thread_id: usize, repo: &Box<dyn Repo>| {
             let destination_path: String =
@@ -73,28 +76,37 @@ pub async fn clone(
                     pull(&branch, destination_path, clone_url, dry_run)
                 }
             } else {
-                let status: bool = run_cmd_s(
-                    Command::new("git")
-                        .args(&create_clone_args(
-                            &branch,
-                            &clone_url,
-                            &active_profile.targetbasepath,
-                            &repo.full_path(),
-                        ))
-                        .stdout(Stdio::null())
-                        .stderr(Stdio::null()),
-                    dry_run,
-                    true,
-                );
-                if status {
-                    helper::prntln(
-                        &format!(
-                            "\n{} {} {}",
-                            "Repository", clone_url, "successfully cloned!"
-                        ),
-                        MessageType::Success,
-                    );
+                let mut cmd = Command::new("git");
+                cmd.args(&create_clone_args(
+                    &branch,
+                    &clone_url,
+                    &active_profile.targetbasepath,
+                    &repo.full_path(),
+                ))
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+
+                match run_cmd_s_retry(&mut cmd, dry_run, true, 3) {
+                    Ok(()) => {
+                        helper::prntln(
+                            &format!(
+                                "\n{} {} {}",
+                                "Repository", clone_url, "successfully cloned!"
+                            ),
+                            MessageType::Success,
+                        );
+                    }
+                    Err(err) => {
+                        prntln(
+                            &format!(
+                                "Failed to clone {} into {}:\n{}",
+                                clone_url, destination_path, err
+                            ),
+                            MessageType::Error,
+                        );
+                    }
                 }
+
                 ControlFlow::Continue(())
             }
         },
@@ -124,14 +136,37 @@ fn pull(
         dry_run,
     );
     if branch_exists != "" {
-        run_cmd_s(
+        if let Err(err) = run_cmd_s_retry(
             create_git_cmd(&destination_path)
                 .arg("checkout")
                 .arg(&current_branch),
             dry_run,
             true,
-        );
-        run_cmd_s(create_git_cmd(&destination_path).arg("pull"), dry_run, true);
+            3,
+        ) {
+            prntln(
+                &format!(
+                    "Failed to checkout '{}' in {}:\n{}",
+                    current_branch, destination_path, err
+                ),
+                MessageType::Error,
+            );
+            return ControlFlow::Continue(());
+        }
+
+        if let Err(err) = run_cmd_s_retry(
+            create_git_cmd(&destination_path).arg("pull"),
+            dry_run,
+            true,
+            3,
+        ) {
+            prntln(
+                &format!("Failed to pull in {}:\n{}", destination_path, err),
+                MessageType::Error,
+            );
+            return ControlFlow::Continue(());
+        }
+
         helper::prntln(
             &format!("{} {} {}", "Repository", clone_url, "successfully pulled!"),
             MessageType::Success,
@@ -163,14 +198,24 @@ fn get_current_pull_branch(
     // Best-effort: ensure the remote refs exist locally before reading origin/HEAD.
     // This fixes repos where the local clone exists but remote refs are missing/stale.
     // Don't silence errors: run_cmd_s would exit(1) on failure, which is what we want here.
-    run_cmd_s(
+    if let Err(err) = run_cmd_s_retry(
         create_git_cmd(destination_path)
             .arg("fetch")
             .arg("--prune")
             .arg("origin"),
         false,
         true,
-    );
+        3,
+    ) {
+        prntln(
+            &format!(
+                "Failed to fetch/prune origin in {}:\n{}",
+                destination_path, err
+            ),
+            MessageType::Error,
+        );
+        return Err(ControlFlow::Break(()));
+    }
 
     // Determine default branch from origin/HEAD (e.g. "origin/main").
     let (symbolic_ref, success) = run_cmd_o_soft(
