@@ -96,7 +96,7 @@ pub async fn update(client: Arc<Client>) -> Result<(), Box<dyn Error>> {
         .await?;
 
     extract(io::Cursor::new(response), &tmp_dir)?;
-    
+
     #[cfg(target_family = "unix")]
     let binary_file_name = tmp_dir.join("grgry");
     #[cfg(target_family = "windows")]

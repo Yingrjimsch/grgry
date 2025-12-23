@@ -54,9 +54,7 @@ impl GitProvider for Gitlab {
 
                 let endpoint: String = format!(
                     "{}/api/v4/{}/{}/projects",
-                    active_profile.baseaddress,
-                    collection_type,
-                    encoded_collection_name
+                    active_profile.baseaddress, collection_type, encoded_collection_name
                 );
                 let headers: Option<Vec<(String, String)>> = match pat {
                     Some(token) => Some(vec![
@@ -129,7 +127,11 @@ impl GitProvider for Gitlab {
             };
             // Block on the async task, so it runs to completion and returns the result.
             let pages: i32 = tokio::runtime::Handle::current().block_on(future);
-            if pages <= 0 { 1 } else { pages }
+            if pages <= 0 {
+                1
+            } else {
+                pages
+            }
         })
     }
 }

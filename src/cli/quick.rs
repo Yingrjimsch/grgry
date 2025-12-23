@@ -43,7 +43,6 @@ pub fn quick(
             }
 
             loop {
-
                 let result = CustomType::<String>::new(
                     "Do you want to quicken this repo? (y)es/(n)o/(m)ore information:",
                 )
