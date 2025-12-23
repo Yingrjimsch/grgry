@@ -143,17 +143,43 @@ fn get_current_pull_branch(
                 .arg("--short"),
             dry_run,
         );
-        if !success {
-            prntln(
-                "There is no HEAD branch defined in origin",
-                MessageType::Error,
-            );
-            return Err(ControlFlow::Break(()));
+        if dry_run {
+            // In dry-run mode we don't execute git, so we can't reliably determine the remote HEAD.
+            // Use the provided branch (if any) or fall back to a common default.
+            if branch.is_empty() {
+                "main".to_string()
+            } else {
+                branch.to_string()
+            }
+        } else {
+            if !success {
+                prntln(
+                    "There is no HEAD branch defined in origin",
+                    MessageType::Error,
+                );
+                return Err(ControlFlow::Break(()));
+            }
+
+            symbolic_ref
+                .strip_prefix("origin/")
+                .map(ToString::to_string)
+                .unwrap_or_else(|| {
+                    prntln(
+                        &format!(
+                            "Could not determine default branch from origin/HEAD (got: '{}')",
+                            symbolic_ref
+                        ),
+                        MessageType::Error,
+                    );
+                    String::new()
+                })
         }
-        symbolic_ref.strip_prefix("origin/").unwrap().to_string()
     } else {
         branch.to_string()
     };
+    if current_branch.is_empty() {
+        return Err(ControlFlow::Break(()));
+    }
     Ok(current_branch)
 }
 
