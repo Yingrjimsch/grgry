@@ -4,7 +4,6 @@ use crate::{
     utils::cmd::{create_git_cmd, run_cmd_o, run_cmd_o_soft, run_cmd_s},
     utils::helper::{self, prntln, run_in_threads_default, MessageType},
 };
-use inquire::error;
 use regex::Regex;
 use reqwest::Client;
 use std::{
@@ -13,7 +12,6 @@ use std::{
     path::Path,
     process::{Command, Stdio},
     sync::Arc,
-    time::Instant,
 };
 
 pub async fn clone(

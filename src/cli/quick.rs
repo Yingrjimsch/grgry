@@ -11,7 +11,7 @@ use super::mass::process_repos;
 
 pub fn quick(
     message: &str,
-    force: bool,
+    _force: bool,
     regex: &str,
     reverse: bool,
     skip_interactive: bool,
