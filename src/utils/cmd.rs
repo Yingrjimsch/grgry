@@ -85,9 +85,13 @@ pub fn run_cmd_s_soft(mut command: &mut Command, test: bool, silent: bool) -> Re
         command.stdout(Stdio::null()).stderr(Stdio::piped());
     }
 
-    let output: Output = command
-        .output()
-        .map_err(|e| format!("Failed to execute command {}: {}", command_to_string(command), e))?;
+    let output: Output = command.output().map_err(|e| {
+        format!(
+            "Failed to execute command {}: {}",
+            command_to_string(command),
+            e
+        )
+    })?;
 
     if output.status.success() {
         return Ok(());
