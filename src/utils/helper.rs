@@ -62,7 +62,9 @@ where
     }
 
     for handle in handles {
-        handle.join().expect("Thread panicked");
+        if let Err(e) = handle.join() {
+            eprintln!("Thread panicked: {:?}", e);
+        }
     }
 
     drop(tx_result); // Close the channel

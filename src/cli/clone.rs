@@ -61,7 +61,17 @@ pub async fn clone(
                 format!("{}/{}", active_profile.targetbasepath, repo.full_path());
             let clone_url = get_clone_url(&active_profile.pulloption, repo);
             if Path::new(&destination_path).exists() {
-                pull(&branch, destination_path, clone_url, dry_run)
+                // In dry-run mode, do not attempt to inspect or pull existing repos (would require
+                // executing git commands and can panic if output is missing/mocked).
+                if dry_run {
+                    prntln(
+                        &format!("Repo exists at {} (dry-run): would pull", destination_path),
+                        MessageType::Neutral,
+                    );
+                    ControlFlow::Continue(())
+                } else {
+                    pull(&branch, destination_path, clone_url, dry_run)
+                }
             } else {
                 let status: bool = run_cmd_s(
                     Command::new("git")
