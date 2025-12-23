@@ -155,41 +155,90 @@ fn get_current_pull_branch(
         });
     }
 
-    let current_branch: String = if branch.is_empty() {
-        let (symbolic_ref, success) = run_cmd_o_soft(
-            create_git_cmd(destination_path)
-                .arg("symbolic-ref")
-                .arg("refs/remotes/origin/HEAD")
-                .arg("--short"),
-            false,
-        );
+    // If user provided a branch, use it as-is.
+    if !branch.is_empty() {
+        return Ok(branch.to_string());
+    }
 
-        if !success {
-            prntln(
-                "There is no HEAD branch defined in origin",
-                MessageType::Error,
-            );
-            return Err(ControlFlow::Break(()));
-        }
+    // Best-effort: ensure the remote refs exist locally before reading origin/HEAD.
+    // This fixes repos where the local clone exists but remote refs are missing/stale.
+    // Don't silence errors: run_cmd_s would exit(1) on failure, which is what we want here.
+    run_cmd_s(
+        create_git_cmd(destination_path)
+            .arg("fetch")
+            .arg("--prune")
+            .arg("origin"),
+        false,
+        true,
+    );
 
-        match symbolic_ref.strip_prefix("origin/") {
-            Some(branch_name) if !branch_name.is_empty() => branch_name.to_string(),
-            _ => {
-                prntln(
-                    &format!(
-                        "Could not determine default branch from origin/HEAD (got: '{}')",
-                        symbolic_ref
-                    ),
-                    MessageType::Error,
-                );
-                return Err(ControlFlow::Break(()));
+    // Determine default branch from origin/HEAD (e.g. "origin/main").
+    let (symbolic_ref, success) = run_cmd_o_soft(
+        create_git_cmd(destination_path)
+            .arg("symbolic-ref")
+            .arg("refs/remotes/origin/HEAD")
+            .arg("--short"),
+        false,
+    );
+
+    if success {
+        if let Some(branch_name) = symbolic_ref.strip_prefix("origin/") {
+            if !branch_name.is_empty() {
+                return Ok(branch_name.to_string());
             }
         }
-    } else {
-        branch.to_string()
-    };
+        prntln(
+            &format!(
+                "Could not determine default branch from origin/HEAD (got: '{}')",
+                symbolic_ref
+            ),
+            MessageType::Error,
+        );
+        return Err(ControlFlow::Break(()));
+    }
 
-    Ok(current_branch)
+    // Fallback: try to read the remote default branch via `git remote show origin`
+    // (works even if origin/HEAD isn't set locally).
+    let (remote_show, ok_remote_show) = run_cmd_o_soft(
+        create_git_cmd(destination_path)
+            .arg("remote")
+            .arg("show")
+            .arg("origin"),
+        false,
+    );
+
+    if ok_remote_show {
+        if let Some(line) = remote_show
+            .lines()
+            .find(|l| l.trim_start().starts_with("HEAD branch:"))
+        {
+            if let Some(head) = line.splitn(2, ':').nth(1).map(|s| s.trim()) {
+                if !head.is_empty() {
+                    return Ok(head.to_string());
+                }
+            }
+        }
+    }
+
+    // Final fallback: avoid hard failure; try "main" then "master" by preferring whatever exists.
+    let (remote_branches, ok_branches) = run_cmd_o_soft(
+        create_git_cmd(destination_path).arg("branch").arg("-r"),
+        false,
+    );
+    if ok_branches {
+        if remote_branches.contains("origin/main") {
+            return Ok("main".to_string());
+        }
+        if remote_branches.contains("origin/master") {
+            return Ok("master".to_string());
+        }
+    }
+
+    prntln(
+        "There is no HEAD branch defined in origin and no default branch could be determined.",
+        MessageType::Error,
+    );
+    Err(ControlFlow::Break(()))
 }
 
 fn get_clone_url<'a>(pulloption: &'a str, repo: &'a Box<dyn Repo>) -> &'a str {
