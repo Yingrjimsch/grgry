@@ -32,6 +32,8 @@ pub trait Repo: Send + Sync {
     fn ssh_url(&self) -> &str;
     fn http_url(&self) -> &str;
     fn full_path(&self) -> &str;
+    fn default_branch(&self) -> Option<&str>;
+    fn last_activity_at(&self) -> Option<chrono::DateTime<chrono::Utc>>;
 }
 
 pub async fn get_repos_paralell(

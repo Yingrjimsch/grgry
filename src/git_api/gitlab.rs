@@ -5,6 +5,7 @@ use crate::{
     git_api::git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
 };
 
+use chrono::{DateTime, Utc};
 use colored::Colorize;
 use reqwest::{Client, Response};
 use serde::Deserialize;
@@ -17,6 +18,9 @@ pub(crate) struct GitlabRepo {
     pub ssh_url_to_repo: String,
     pub http_url_to_repo: String,
     pub path_with_namespace: String,
+    pub default_branch: Option<String>,
+    pub last_activity_at: Option<DateTime<Utc>>,
+    pub last_repository_activity_at: Option<DateTime<Utc>>,
 }
 
 impl Repo for GitlabRepo {
@@ -30,6 +34,15 @@ impl Repo for GitlabRepo {
 
     fn full_path(&self) -> &str {
         &self.path_with_namespace
+    }
+
+    fn default_branch(&self) -> Option<&str> {
+        self.default_branch.as_deref()
+    }
+
+    fn last_activity_at(&self) -> Option<DateTime<Utc>> {
+        self.last_repository_activity_at
+            .or(self.last_activity_at)
     }
 }
 

@@ -9,6 +9,7 @@ use crate::{
     config::config::Profile,
     git_api::git_providers::{call_api, get_repos_paralell, GitProvider, Repo},
 };
+use chrono::{DateTime, Utc};
 const PER_PAGE: i16 = 100;
 
 #[derive(Debug, Deserialize)]
@@ -16,6 +17,8 @@ pub struct GithubRepo {
     pub ssh_url: String,
     pub clone_url: String,
     pub full_name: String,
+    pub default_branch: Option<String>,
+    pub pushed_at: Option<DateTime<Utc>>,
 }
 
 impl Repo for GithubRepo {
@@ -29,6 +32,14 @@ impl Repo for GithubRepo {
 
     fn full_path(&self) -> &str {
         &self.full_name
+    }
+
+    fn default_branch(&self) -> Option<&str> {
+        self.default_branch.as_deref()
+    }
+
+    fn last_activity_at(&self) -> Option<DateTime<Utc>> {
+        self.pushed_at
     }
 }
 
